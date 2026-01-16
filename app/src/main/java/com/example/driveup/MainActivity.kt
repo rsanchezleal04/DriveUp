@@ -38,6 +38,7 @@ import com.example.driveup.navigation.SpeedManager
 import com.google.firebase.auth.FirebaseAuth
 import android.view.View
 import androidx.appcompat.app.AlertDialog
+import kotlin.math.*
 
 
 
@@ -252,6 +253,8 @@ class MainActivity : AppCompatActivity() {
             override fun onLocationResult(result: LocationResult) {
                 val loc = result.lastLocation ?: return
                 currentLocation = loc
+                updateCameraFollowingCar(loc)
+
 
                 val speed = speedManager.update(loc)
                 tvSpeed.text = speed.toString()
@@ -285,7 +288,7 @@ class MainActivity : AppCompatActivity() {
         map.locationComponent.cameraMode = CameraMode.NONE
 
         val position = CameraPosition.Builder()
-            .target(LatLng(location.latitude, location.longitude))
+            .target(getOffsetLatLng(location, 40.0))
             .zoom(17.0)
             .tilt(45.0)
             .bearing(location.bearing.toDouble())
@@ -312,7 +315,7 @@ class MainActivity : AppCompatActivity() {
         followUser = true
 
         val position = CameraPosition.Builder()
-            .target(LatLng(loc.latitude, loc.longitude))
+            .target(getOffsetLatLng(loc, 40.0))
             .zoom(17.0)
             .tilt(45.0)
             .bearing(loc.bearing.toDouble())
@@ -329,6 +332,33 @@ class MainActivity : AppCompatActivity() {
             }
         }, 1100)
     }
+
+    //====================== TRACKING=============================
+    private fun updateCameraFollowingCar(loc: Location) {
+        if (!followUser) return
+        if (!navigating) return
+        if (!mapReady) return
+
+        // 🚗 Si estamos casi parados, NO rotamos el mapa
+        val bearing = if (loc.hasSpeed() && loc.speed >= 0.55f) {
+            loc.bearing.toDouble()
+        } else {
+            map.cameraPosition.bearing
+        }
+
+        val position = CameraPosition.Builder()
+            .target(LatLng(loc.latitude, loc.longitude))
+            .zoom(map.cameraPosition.zoom)
+            .tilt(45.0)
+            .bearing(bearing)
+            .build()
+
+        map.animateCamera(
+            CameraUpdateFactory.newCameraPosition(position),
+            500
+        )
+    }
+
 
 
 
@@ -614,6 +644,37 @@ class MainActivity : AppCompatActivity() {
 
 
     // ================= CAMERA =================
+    private fun getOffsetLatLng(
+        location: Location,
+        offsetMeters: Double
+    ): LatLng {
+
+        val bearing = location.bearing.toDouble()
+
+        val earthRadius = 6378137.0 // metros
+        val distance = offsetMeters / earthRadius
+
+        val lat1 = Math.toRadians(location.latitude)
+        val lon1 = Math.toRadians(location.longitude)
+        val brng = Math.toRadians(bearing)
+
+        val lat2 = asin(
+            sin(lat1) * cos(distance) +
+                    cos(lat1) * sin(distance) * cos(brng)
+        )
+
+        val lon2 = lon1 + atan2(
+            sin(brng) * sin(distance) * cos(lat1),
+            cos(distance) - sin(lat1) * sin(lat2)
+        )
+
+        return LatLng(
+            Math.toDegrees(lat2),
+            Math.toDegrees(lon2)
+        )
+    }
+
+
 
     // ================= DIRECCIONS =================
 
