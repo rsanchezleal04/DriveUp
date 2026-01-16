@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1017070698432",
+    "project_id": "driveup-8467a",
+    "storage_bucket": "driveup-8467a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1017070698432:android:18bf0ad00c577c23f15225",
+        "android_client_info": {
+          "package_name": "com.example.driveup"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDLS8eJYw76S9ThKFzBWIyDNDdCYFRn2bE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

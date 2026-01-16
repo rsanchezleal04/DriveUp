@@ -35,6 +35,10 @@ import org.maplibre.geojson.Point
 import android.speech.tts.TextToSpeech
 import java.util.Locale
 import com.example.driveup.navigation.SpeedManager
+import com.google.firebase.auth.FirebaseAuth
+import android.view.View
+import androidx.appcompat.app.AlertDialog
+
 
 
 
@@ -64,7 +68,7 @@ class MainActivity : AppCompatActivity() {
 
     private val client = OkHttpClient()
     private lateinit var fusedLocation: FusedLocationProviderClient
-    private lateinit var locationCallback: LocationCallback
+    private var locationCallback: LocationCallback? = null
 
     private var currentLocation: Location? = null
     private var routePoints: List<LatLng> = emptyList()
@@ -106,6 +110,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvSpeed: TextView
 
 
+
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) enableLocation()
@@ -113,6 +118,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
 
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
@@ -147,12 +153,11 @@ class MainActivity : AppCompatActivity() {
 
                 // Si el usuario mueve el mapa → modo libre
                 map.addOnCameraMoveStartedListener { reason ->
-                    if (reason == 1) { // 1 = usuario tocó el mapa
+                    if (reason == 1) { // gesto del usuario
                         followUser = false
                         map.locationComponent.cameraMode = CameraMode.NONE
                     }
                 }
-
             }
         }
 
@@ -177,7 +182,15 @@ class MainActivity : AppCompatActivity() {
                 tts.language = Locale("es", "ES")
             }
         }
+
+        val btnSettings = findViewById<ImageButton>(R.id.btnSettings)
+
+        btnSettings.setOnClickListener {
+            showSettingsMenu(it)
+        }
+
     }
+
 
 
 
@@ -254,12 +267,11 @@ class MainActivity : AppCompatActivity() {
                     updateStepDistance(loc)
                 }
             }
-
         }
 
         fusedLocation.requestLocationUpdates(
             request,
-            locationCallback,
+            locationCallback!!,
             mainLooper
         )
     }
@@ -808,6 +820,45 @@ class MainActivity : AppCompatActivity() {
                 ivTurnIcon.setImageResource(R.drawable.ic_arrive)
         }
     }
+//------------------------------LOGOUT------------------------------------
+    private fun logout() {
+        FirebaseAuth.getInstance().signOut()
+
+        val intent = Intent(this, LoginActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+    }
+
+    private fun showSettingsMenu(anchor: View) {
+        val popup = PopupMenu(this, anchor)
+        popup.menuInflater.inflate(R.menu.menu_settings, popup.menu)
+
+        popup.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                R.id.action_logout -> {
+                    confirmLogout()
+                    true
+                }
+                else -> false
+            }
+        }
+
+        popup.show()
+    }
+
+    private fun confirmLogout() {
+        AlertDialog.Builder(this)
+            .setTitle("Cerrar sesión")
+            .setMessage("¿Quieres cerrar sesión?")
+            .setPositiveButton("Sí") { _, _ ->
+                logout()
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+
+
 
 
 
@@ -818,10 +869,15 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         mapView.onDestroy()
-        fusedLocation.removeLocationUpdates(locationCallback)
+
+        locationCallback?.let {
+            fusedLocation.removeLocationUpdates(it)
+        }
+
         window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         tts.shutdown()
     }
+
 
 
 

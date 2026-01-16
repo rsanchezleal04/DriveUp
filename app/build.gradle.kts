@@ -1,19 +1,20 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    id("com.google.gms.google-services")
 }
+
 
 android {
     namespace = "com.example.driveup"
-    compileSdk = 34  // Mantenemos 34 por ahora
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.example.driveup"
         minSdk = 26
-        targetSdk = 34  // Actualizado de 33 a 34
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -42,36 +43,38 @@ android {
 }
 
 dependencies {
-    // ✅ VERSIONES COMPATIBLES CON COMPILESDK 34
-    implementation("androidx.core:core-ktx:1.12.0")        // Compatible con SDK 34
-    implementation("androidx.appcompat:appcompat:1.6.1")    // Versión estable
-    implementation("com.google.android.material:material:1.11.0")  // Material Design
 
-    // ✅ GOOGLE PLAY SERVICES - ESENCIAL PARA GPS
+    // 🧠 ANDROID CORE
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("com.google.android.material:material:1.11.0")
+
+    // 📍 GPS
     implementation("com.google.android.gms:play-services-location:21.0.1")
 
-    // ✅ RETROFIT & HTTP
+    // 🌍 MAPA
+    implementation("org.maplibre.gl:android-sdk:11.8.0")
+
+    // 🌐 NETWORK
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
-    // ✅ COROUTINES
+    // ⚙️ COROUTINES
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
-    // ✅ TESTING
+    // 🔥 FIREBASE
+    implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+
+    // 🧪 TESTING
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
 
-    // Para manejo moderno de Activity Results (permisos)
+    // 🎯 Activity Result APIs
     implementation("androidx.activity:activity-ktx:1.8.0")
     implementation("androidx.fragment:fragment-ktx:1.6.2")
-
-    // Ya tienes esto:
-    implementation("org.maplibre.gl:android-sdk:11.8.0")
-
-    implementation("com.google.android.material:material:1.11.0")
-
-
 }

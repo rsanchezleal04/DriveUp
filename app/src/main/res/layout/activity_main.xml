@@ -15,6 +15,20 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>
 
+    <!-- ⚙️ BOTÓN AJUSTES -->
+    <ImageButton
+        android:id="@+id/btnSettings"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:background="@android:color/transparent"
+        android:src="@android:drawable/ic_menu_manage"
+        android:contentDescription="Ajustes"
+        app:tint="@color/driveup_orange"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topContainer"/>
+
     <!-- 🆕 SPEED HUD -->
     <LinearLayout
         android:id="@+id/speedContainer"
@@ -29,16 +43,13 @@
         app:layout_constraintTop_toBottomOf="@id/topContainer"
         app:layout_constraintEnd_toEndOf="parent">
 
-
-    <ImageView
+        <ImageView
             android:id="@+id/ivSpeedIcon"
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:src="@drawable/ic_speed"
-            android:contentDescription="Velocidad actual"
-            app:tint="@android:color/white"
+            app:tint="@color/driveup_orange"
             android:layout_marginEnd="6dp"/>
-
 
         <TextView
             android:id="@+id/tvSpeed"
@@ -66,7 +77,7 @@
         android:layout_margin="16dp"
         android:background="@android:color/transparent"
         android:src="@android:drawable/ic_menu_mylocation"
-        app:tint="@android:color/black"
+        app:tint="@color/driveup_orange"
         android:contentDescription="Centrar ubicación"
         app:layout_constraintBottom_toTopOf="@id/navigationBar"
         app:layout_constraintEnd_toEndOf="parent"/>
@@ -86,7 +97,6 @@
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Origen"
             app:hintTextColor="@android:color/white">
 
             <AutoCompleteTextView
@@ -116,10 +126,13 @@
             android:text="Iniciar ruta"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"/>
+            android:layout_marginTop="6dp"
+            android:backgroundTint="@color/driveup_orange"
+            android:textColor="@android:color/white"
+            android:textStyle="bold"/>
     </LinearLayout>
 
-    <!-- BARRA INFERIOR DE NAVEGACIÓN -->
+    <!-- BARRA INFERIOR -->
     <LinearLayout
         android:id="@+id/navigationBar"
         android:orientation="vertical"
@@ -132,7 +145,6 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- FILA SUPERIOR: ICONO GIRO + BOTÓN MUTE -->
         <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
@@ -142,42 +154,37 @@
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:layout_centerHorizontal="true"
-                app:tint="@android:color/white"/>
+                app:tint="@color/driveup_orange"/>
 
             <ImageButton
                 android:id="@+id/btnMute"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true"
                 android:background="@android:color/transparent"
-                android:contentDescription="Silenciar voz"
                 android:src="@android:drawable/ic_lock_silent_mode_off"
-                app:tint="@android:color/white" />
+                app:tint="@color/driveup_orange"/>
         </RelativeLayout>
 
         <TextView
             android:id="@+id/tvInstruction"
             android:textColor="@android:color/white"
             android:textSize="18sp"
-            android:text="Siguiente instrucción"
+            android:layout_marginTop="6dp"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"/>
+            android:layout_height="wrap_content"/>
 
         <TextView
             android:id="@+id/tvStepDistance"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="– m"
             android:textColor="@android:color/white"
-            android:textSize="16sp"/>
+            android:textSize="16sp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
 
         <TextView
             android:id="@+id/tvEta"
             android:textColor="@android:color/white"
             android:textSize="16sp"
-            android:text="ETA"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"/>
     </LinearLayout>
