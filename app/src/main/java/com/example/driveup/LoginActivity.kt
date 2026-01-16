@@ -38,25 +38,49 @@ class LoginActivity : AppCompatActivity() {
         val btnRegister = findViewById<Button>(R.id.btnRegister)
 
         btnLogin.setOnClickListener {
-            login(etEmail.text.toString(), etPassword.text.toString())
+            val email = etEmail.text.toString().trim()
+            val pass = etPassword.text.toString().trim()
+
+            if (email.isEmpty() || pass.isEmpty()) {
+                toast("Introduce email y contraseña")
+                return@setOnClickListener
+            }
+
+            login(email, pass)
         }
 
+
         btnRegister.setOnClickListener {
-            register(etEmail.text.toString(), etPassword.text.toString())
+            val email = etEmail.text.toString().trim()
+            val pass = etPassword.text.toString().trim()
+
+            if (email.isEmpty() || pass.isEmpty()) {
+                toast("Rellena todos los campos")
+                return@setOnClickListener
+            }
+
+            register(email, pass)
         }
+
     }
 
 
     private fun login(email: String, pass: String) {
+
+        if (email.isBlank() || pass.isBlank()) {
+            toast("Campos vacíos")
+            return
+        }
+
         auth.signInWithEmailAndPassword(email, pass)
             .addOnSuccessListener {
                 goToMain()
             }
-
             .addOnFailureListener {
                 toast("Error: ${it.message}")
             }
     }
+
 
     private fun register(email: String, pass: String) {
         if (email.isBlank() || pass.length < 6) {
