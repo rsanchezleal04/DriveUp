@@ -2,59 +2,52 @@ package com.example.driveup.navigation
 
 import android.location.Location
 import kotlin.math.roundToInt
+import kotlin.math.abs
 
 class SpeedManager {
 
-    private val speedBuffer = ArrayDeque<Float>()
-    private val BUFFER_SIZE = 5
+    private var lastSpeedKmh = 0f
+    private var smoothedSpeed = 0f
 
-    private var lastSpeedKmh = 0
+    // Factor de suavizado
+    // Más alto = más reactivo
+    private val ALPHA_FAST = 0.6f
+    private val ALPHA_SLOW = 0.2f
 
-    /**
-     * Actualiza la velocidad con una nueva localización
-     * @return velocidad en km/h (entero, suavizado)
-     */
     fun update(location: Location): Int {
 
         if (!location.hasSpeed()) {
-            return lastSpeedKmh
+            return lastSpeedKmh.roundToInt()
         }
 
-        val speedKmh = location.speed * 3.6f
+        val rawSpeed = location.speed * 3.6f
 
-        // Ignorar ruido cuando estamos prácticamente parados
-        if (speedKmh < 1f) {
-            speedBuffer.clear()
-            lastSpeedKmh = 0
+        // Ruido cuando estamos casi parados
+        if (rawSpeed < 0.8f) {
+            smoothedSpeed = 0f
+            lastSpeedKmh = 0f
             return 0
         }
 
-        // Guardar en buffer
-        speedBuffer.addLast(speedKmh)
+        val delta = abs(rawSpeed - smoothedSpeed)
 
-        if (speedBuffer.size > BUFFER_SIZE) {
-            speedBuffer.removeFirst()
-        }
+        // Si hay cambio fuerte → reacción rápida
+        val alpha = if (delta > 8f) ALPHA_FAST else ALPHA_SLOW
 
-        // Media móvil
-        val avg = speedBuffer.average().toFloat()
-        lastSpeedKmh = avg.roundToInt()
+        smoothedSpeed =
+            alpha * rawSpeed + (1f - alpha) * smoothedSpeed
 
-        return lastSpeedKmh
+        lastSpeedKmh = smoothedSpeed
+
+        return smoothedSpeed.roundToInt()
     }
 
-    /**
-     * Velocidad actual sin actualizar
-     */
     fun getCurrentSpeed(): Int {
-        return lastSpeedKmh
+        return lastSpeedKmh.roundToInt()
     }
 
-    /**
-     * Reset completo (por ejemplo al cerrar navegación)
-     */
     fun reset() {
-        speedBuffer.clear()
-        lastSpeedKmh = 0
+        smoothedSpeed = 0f
+        lastSpeedKmh = 0f
     }
 }

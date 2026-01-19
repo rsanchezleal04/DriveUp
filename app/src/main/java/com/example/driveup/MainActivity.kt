@@ -39,6 +39,10 @@ import com.google.firebase.auth.FirebaseAuth
 import android.view.View
 import androidx.appcompat.app.AlertDialog
 import kotlin.math.*
+import com.example.driveup.navigation.TripStatsManager
+import com.example.driveup.navigation.TripResult
+import com.google.firebase.firestore.FirebaseFirestore
+
 
 
 
@@ -110,6 +114,11 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var tvSpeed: TextView
 
+    private val tripStatsManager = TripStatsManager()
+
+    private val auth = FirebaseAuth.getInstance()
+
+    private val db = FirebaseFirestore.getInstance()
 
 
     private val permissionLauncher =
@@ -228,7 +237,7 @@ class MainActivity : AppCompatActivity() {
             val lc = map.locationComponent
             lc.activateLocationComponent(activationOptions)
             lc.isLocationComponentEnabled = true
-            lc.cameraMode = CameraMode.TRACKING
+            lc.cameraMode = CameraMode.NONE
             lc.renderMode = RenderMode.COMPASS
 
             startLocationUpdates()
@@ -254,6 +263,8 @@ class MainActivity : AppCompatActivity() {
                 val loc = result.lastLocation ?: return
                 currentLocation = loc
                 updateCameraFollowingCar(loc)
+                tripStatsManager.onLocationUpdate(loc)
+
 
 
                 val speed = speedManager.update(loc)
@@ -298,13 +309,6 @@ class MainActivity : AppCompatActivity() {
             CameraUpdateFactory.newCameraPosition(position),
             1200
         )
-
-        mapView.postDelayed({
-            if (followUser) {
-                map.locationComponent.cameraMode = CameraMode.TRACKING
-            }
-        }, 1300)
-
     }
 
     // ================= BOTÓN CENTRAR =================
@@ -325,39 +329,35 @@ class MainActivity : AppCompatActivity() {
             CameraUpdateFactory.newCameraPosition(position),
             1000
         )
-
-        mapView.postDelayed({
-            if (followUser) {
-                map.locationComponent.cameraMode = CameraMode.TRACKING
-            }
-        }, 1100)
     }
 
     //====================== TRACKING=============================
     private fun updateCameraFollowingCar(loc: Location) {
         if (!followUser) return
-        if (!navigating) return
         if (!mapReady) return
 
-        // 🚗 Si estamos casi parados, NO rotamos el mapa
+        // Bearing solo si velocidad ≥ 2 km/h (≈ 0.55 m/s)
         val bearing = if (loc.hasSpeed() && loc.speed >= 0.55f) {
             loc.bearing.toDouble()
         } else {
             map.cameraPosition.bearing
         }
 
+        val target = getOffsetLatLng(loc, 40.0)
+
         val position = CameraPosition.Builder()
-            .target(LatLng(loc.latitude, loc.longitude))
-            .zoom(map.cameraPosition.zoom)
+            .target(target)
+            .zoom(17.0)
             .tilt(45.0)
             .bearing(bearing)
             .build()
 
         map.animateCamera(
             CameraUpdateFactory.newCameraPosition(position),
-            500
+            600
         )
     }
+
 
 
 
@@ -412,6 +412,10 @@ class MainActivity : AppCompatActivity() {
 
         val distanceKm = route.getDouble("distance") / 1000
         val durationMin = route.getDouble("duration") / 60
+        tripStatsManager.startTrip(
+            optimalDistanceMeters = route.getDouble("distance"),
+            optimalDurationSeconds = route.getDouble("duration")
+        )
 
         tvEta.text = formatTime(distanceKm, durationMin)
         navigationBar.visibility = LinearLayout.VISIBLE
@@ -615,6 +619,9 @@ class MainActivity : AppCompatActivity() {
         toast("Has llegado a tu destino 🚗")
 
         clearRoute()
+        val tripResult = tripStatsManager.finishTrip()
+        saveTripResult(tripResult)
+        showTripSummary(tripResult)
 
         // UI
         navigationBar.visibility = LinearLayout.GONE
@@ -896,13 +903,21 @@ class MainActivity : AppCompatActivity() {
 
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
+
+                R.id.action_points -> {
+                    startActivity(Intent(this, PointsActivity::class.java))
+                    true
+                }
+
                 R.id.action_logout -> {
                     confirmLogout()
                     true
                 }
+
                 else -> false
             }
         }
+
 
         popup.show()
     }
@@ -918,6 +933,69 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+
+//=================== PUNTOS ===============================
+private fun saveTripResult(tripResult: TripResult) {
+
+    val uid = auth.currentUser?.uid ?: return
+
+    val userRef = db.collection("users").document(uid)
+
+    db.runTransaction { transaction ->
+
+        val snapshot = transaction.get(userRef)
+
+        val currentPoints = snapshot.getLong("points")?.toInt() ?: 0
+        val currentKm = snapshot.getDouble("totalKm") ?: 0.0
+
+        val newPoints = currentPoints + tripResult.pointsEarned
+        val km = tripResult.realDistanceMeters / 1000.0
+
+
+        transaction.update(
+            userRef,
+            mapOf(
+                "points" to newPoints,
+                "totalKm" to km
+            )
+        )
+    }
+        .addOnSuccessListener {
+            toast("+${tripResult.pointsEarned} puntos")
+        }
+        .addOnFailureListener {
+            toast("Error guardando puntos")
+        }
+}
+
+    private fun showTripSummary(tripResult: TripResult) {
+
+        val view = layoutInflater.inflate(R.layout.dialog_trip_summary, null)
+
+        val realKm = tripResult.realDistanceMeters / 1000.0
+        val realHours = tripResult.realDurationSeconds / 3600.0
+        val optimalHours = tripResult.optimalDurationSeconds / 3600.0
+
+        val realSpeed = realKm / realHours
+        val optimalSpeed = realKm / optimalHours
+
+        view.findViewById<TextView>(R.id.tvDistance).text =
+            "Distancia: %.2f km".format(realKm)
+
+        view.findViewById<TextView>(R.id.tvOptimalSpeed).text =
+            "Velocidad óptima: %.1f km/h".format(optimalSpeed)
+
+        view.findViewById<TextView>(R.id.tvRealSpeed).text =
+            "Tu velocidad media: %.1f km/h".format(realSpeed)
+
+        view.findViewById<TextView>(R.id.tvPoints).text =
+            "Puntos ganados: ${tripResult.pointsEarned}"
+
+        AlertDialog.Builder(this)
+            .setView(view)
+            .setPositiveButton("Aceptar", null)
+            .show()
+    }
 
 
 
