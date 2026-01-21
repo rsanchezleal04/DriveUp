@@ -8,7 +8,7 @@
 
     <EditText
         android:id="@+id/etEmail"
-        android:hint="Email"
+        android:hint="Email o Username"
         android:inputType="textEmailAddress"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

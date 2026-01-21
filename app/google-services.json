@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "1017070698432",
+    "firebase_url": "https://driveup-8467a-default-rtdb.firebaseio.com",
     "project_id": "driveup-8467a",
     "storage_bucket": "driveup-8467a.firebasestorage.app"
   },
@@ -12,7 +13,20 @@
           "package_name": "com.example.driveup"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1017070698432-3csrmloiaddj45gkc3arg4b5cciloi74.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.driveup",
+            "certificate_hash": "85df45dbafd6a3a2d758efb5121a2c14438e4eb0"
+          }
+        },
+        {
+          "client_id": "1017070698432-oo7q55guuj4kgcr2vp319uu3nd6uioal.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDLS8eJYw76S9ThKFzBWIyDNDdCYFRn2bE"
@@ -20,7 +34,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1017070698432-oo7q55guuj4kgcr2vp319uu3nd6uioal.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

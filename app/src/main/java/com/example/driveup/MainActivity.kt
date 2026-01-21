@@ -938,7 +938,6 @@ class MainActivity : AppCompatActivity() {
 private fun saveTripResult(tripResult: TripResult) {
 
     val uid = auth.currentUser?.uid ?: return
-
     val userRef = db.collection("users").document(uid)
 
     db.runTransaction { transaction ->
@@ -949,14 +948,13 @@ private fun saveTripResult(tripResult: TripResult) {
         val currentKm = snapshot.getDouble("totalKm") ?: 0.0
 
         val newPoints = currentPoints + tripResult.pointsEarned
-        val km = tripResult.realDistanceMeters / 1000.0
-
+        val newKm = currentKm + (tripResult.realDistanceMeters / 1000.0)
 
         transaction.update(
             userRef,
             mapOf(
                 "points" to newPoints,
-                "totalKm" to km
+                "totalKm" to newKm
             )
         )
     }
@@ -967,6 +965,7 @@ private fun saveTripResult(tripResult: TripResult) {
             toast("Error guardando puntos")
         }
 }
+
 
     private fun showTripSummary(tripResult: TripResult) {
 

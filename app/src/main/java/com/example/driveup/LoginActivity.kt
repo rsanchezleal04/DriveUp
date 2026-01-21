@@ -6,13 +6,8 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.example.driveup.Models.User
-
-// 🔥 Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-
-
 
 class LoginActivity : AppCompatActivity() {
 
@@ -24,99 +19,97 @@ class LoginActivity : AppCompatActivity() {
 
         auth = FirebaseAuth.getInstance()
 
-        // 🔥 SI YA HAY SESIÓN → DIRECTO A MAIN
-        if (auth.currentUser != null) {
-            goToMain()
+        // 🔥 Si ya hay sesión activa → Main
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            checkUserInFirestore(currentUser.uid)
             return
         }
 
+
         setContentView(R.layout.activity_login)
 
-        val etEmail = findViewById<EditText>(R.id.etEmail)
+        val etUser = findViewById<EditText>(R.id.etEmail) // email o username
         val etPassword = findViewById<EditText>(R.id.etPassword)
         val btnLogin = findViewById<Button>(R.id.btnLogin)
         val btnRegister = findViewById<Button>(R.id.btnRegister)
 
         btnLogin.setOnClickListener {
-            val email = etEmail.text.toString().trim()
+            val input = etUser.text.toString().trim()
             val pass = etPassword.text.toString().trim()
 
-            if (email.isEmpty() || pass.isEmpty()) {
-                toast("Introduce email y contraseña")
+            if (input.isEmpty() || pass.isEmpty()) {
+                toast("Introduce usuario/email y contraseña")
                 return@setOnClickListener
             }
 
-            login(email, pass)
+            login(input, pass)
         }
-
 
         btnRegister.setOnClickListener {
-            val email = etEmail.text.toString().trim()
-            val pass = etPassword.text.toString().trim()
-
-            if (email.isEmpty() || pass.isEmpty()) {
-                toast("Rellena todos los campos")
-                return@setOnClickListener
-            }
-
-            register(email, pass)
+            startActivity(Intent(this, RegisterActivity::class.java))
         }
-
     }
 
+    // 🔐 LOGIN CON EMAIL O USERNAME
+    private fun login(input: String, pass: String) {
 
-    private fun login(email: String, pass: String) {
-
-        if (email.isBlank() || pass.isBlank()) {
-            toast("Campos vacíos")
+        // Caso 1 → email
+        if (input.contains("@")) {
+            auth.signInWithEmailAndPassword(input, pass)
+                .addOnSuccessListener { goToMain() }
+                .addOnFailureListener {
+                    toast("Credenciales incorrectas")
+                }
             return
         }
 
-        auth.signInWithEmailAndPassword(email, pass)
-            .addOnSuccessListener {
-                goToMain()
+        // Caso 2 → username
+        db.collection("users")
+            .whereEqualTo("username", input)
+            .limit(1)
+            .get()
+            .addOnSuccessListener { snap ->
+                if (snap.isEmpty) {
+                    toast("Usuario no encontrado")
+                    return@addOnSuccessListener
+                }
+
+                val email = snap.documents[0].getString("email")
+                if (email == null) {
+                    toast("Error interno")
+                    return@addOnSuccessListener
+                }
+
+                auth.signInWithEmailAndPassword(email, pass)
+                    .addOnSuccessListener { goToMain() }
+                    .addOnFailureListener {
+                        toast("Credenciales incorrectas")
+                    }
             }
             .addOnFailureListener {
-                toast("Error: ${it.message}")
+                toast("Error al iniciar sesión")
             }
     }
 
-
-    private fun register(email: String, pass: String) {
-        if (email.isBlank() || pass.length < 6) {
-            toast("Email inválido o contraseña muy corta")
-            return
-        }
-
-        auth.createUserWithEmailAndPassword(email, pass)
-            .addOnSuccessListener {
-                val uid = it.user?.uid ?: return@addOnSuccessListener
-
-                val user = User(uid, email, 0, 0.0)
-
-                db.collection("users")
-                    .document(uid)
-                    .set(user)
-                    .addOnSuccessListener {
-                        toast("Cuenta creada correctamente 🎉")
-                        goToMain()
-                    }
-                    .addOnFailureListener { e ->
-                        toast("Error guardando usuario: ${e.message}")
-                    }
+    private fun checkUserInFirestore(uid: String) {
+        db.collection("users")
+            .document(uid)
+            .get()
+            .addOnSuccessListener { doc ->
+                if (doc.exists()) {
+                    goToMain()
+                } else {
+                    // 🔥 Usuario Auth existe pero Firestore NO → sesión inválida
+                    auth.signOut()
+                    toast("Tu cuenta ya no existe. Regístrate de nuevo.")
+                }
             }
-            .addOnFailureListener { e ->
-                toast(
-                    when {
-                        e.message?.contains("email address is already in use") == true ->
-                            "Este email ya está registrado"
-                        else ->
-                            "Error creando cuenta: ${e.message}"
-                    }
-                )
+            .addOnFailureListener {
+                auth.signOut()
+                toast("Error verificando usuario")
             }
     }
-
 
 
     private fun goToMain() {
