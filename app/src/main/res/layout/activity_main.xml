@@ -130,6 +130,16 @@
             android:backgroundTint="@color/driveup_orange"
             android:textColor="@android:color/white"
             android:textStyle="bold"/>
+
+        <Button
+            android:id="@+id/btnCancelRoute"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Cancelar ruta"
+            android:backgroundTint="#B00020"
+            android:textColor="@android:color/white"
+            android:visibility="gone"/>
+
     </LinearLayout>
 
     <!-- BARRA INFERIOR -->

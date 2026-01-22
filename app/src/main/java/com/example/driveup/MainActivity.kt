@@ -42,6 +42,13 @@ import kotlin.math.*
 import com.example.driveup.navigation.TripStatsManager
 import com.example.driveup.navigation.TripResult
 import com.google.firebase.firestore.FirebaseFirestore
+import android.text.Editable
+import android.text.TextWatcher
+import java.net.URLEncoder
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+
 
 
 
@@ -129,7 +136,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         MapLibre.getInstance(this)
@@ -139,12 +145,6 @@ class MainActivity : AppCompatActivity() {
         mapView = findViewById(R.id.mapView)
         etOrigin = findViewById(R.id.etOrigin)
         etDestination = findViewById(R.id.etDestination)
-        // Limpiar "Destino" al tocar el campo
-        etDestination.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus && etDestination.text.toString().equals("Destino", true)) {
-                etDestination.text.clear()
-            }
-        }
 
         btnRoute = findViewById(R.id.btnRoute)
         btnCenter = findViewById(R.id.btnCenterLocation)
@@ -168,7 +168,6 @@ class MainActivity : AppCompatActivity() {
                 mapReady = true
                 checkPermission()
 
-                // Si el usuario mueve el mapa → modo libre
                 map.addOnCameraMoveStartedListener { reason ->
                     if (reason == 1) { // gesto del usuario
                         followUser = false
@@ -201,14 +200,81 @@ class MainActivity : AppCompatActivity() {
         }
 
         val btnSettings = findViewById<ImageButton>(R.id.btnSettings)
-
         btnSettings.setOnClickListener {
             showSettingsMenu(it)
         }
 
+        // =====================================================
+        // AUTOCOMPLETADO DESTINO (Geoapify - GRATIS)
+        // =====================================================
+
+        var searchJob: Job? = null
+        val client = OkHttpClient()
+
+        etDestination.addTextChangedListener(object : TextWatcher {
+
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                if (!etDestination.isEnabled) return
+                val query = s.toString().trim()
+                if (query.length < 3) return
+
+                searchJob?.cancel()
+                searchJob = lifecycleScope.launch(Dispatchers.IO) {
+                    delay(300) // debounce para no saturar API
+
+                    try {
+                        val url =
+                            "https://api.geoapify.com/v1/geocode/autocomplete" +
+                                    "?text=${URLEncoder.encode(query, "UTF-8")}" +
+                                    "&lang=es" +
+                                    "&limit=5" +
+                                    "&apiKey=bfde33420b5842fea5085295622148e9" // <--- Pon aquí tu API Key válida
+
+                        val request = Request.Builder().url(url).build()
+                        val response = client.newCall(request).execute()
+                        val body = response.body?.string() ?: return@launch
+
+                        val suggestions = mutableListOf<String>()
+                        val json = JSONObject(body)
+                        val features = json.optJSONArray("features") ?: JSONArray()
+
+                        for (i in 0 until features.length()) {
+                            val props = features.getJSONObject(i).getJSONObject("properties")
+                            suggestions.add(props.getString("formatted"))
+                        }
+
+                        withContext(Dispatchers.Main) {
+                            val adapter = ArrayAdapter(
+                                this@MainActivity,
+                                android.R.layout.simple_dropdown_item_1line,
+                                suggestions
+                            )
+                            etDestination.setAdapter(adapter)
+                            etDestination.showDropDown()
+                        }
+                    } catch (e: Exception) {
+                        // Evitar crasheos si falla la API
+                        e.printStackTrace()
+                    }
+                }
+            }
+        })
+
+        etDestination.setOnItemClickListener { parent, _, position, _ ->
+            val selected = parent.getItemAtPosition(position) as String
+            etDestination.setText(selected)
+            etDestination.setSelection(selected.length)
+        }
+
+        val btnCancelRoute = findViewById<Button>(R.id.btnCancelRoute)
+
+        btnCancelRoute.setOnClickListener {
+            cancelRoute()
+        }
+
     }
-
-
 
 
     // ================= PERMISOS =================
@@ -408,12 +474,71 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread { drawRoute(res) }
     }
 
+    private fun onNavigationStarted() {
+        navigating = true
+
+        // Ocultar inputs
+        etOrigin.clearFocus()
+        etDestination.clearFocus()
+
+        etOrigin.visibility = View.GONE
+        etDestination.visibility = View.GONE
+        btnRoute.visibility = View.GONE
+
+        // MUY IMPORTANTE: desactivar autocompletado
+        etDestination.dismissDropDown()
+        etDestination.isEnabled = false
+
+        findViewById<View>(R.id.btnCancelRoute).visibility = View.VISIBLE
+
+    }
+
+    private fun cancelRoute() {
+
+        if (!navigating) return
+
+        navigating = false
+        arrived = false
+
+        // Guardar puntos SOLO hasta ahora
+        val tripResult = tripStatsManager.finishTrip()
+        saveTripResult(tripResult)
+
+        // Limpiar navegación
+        clearRoute()
+        navigationSteps = emptyList()
+        currentStepIndex = 0
+        destinationLatLng = null
+
+        // UI
+        navigationBar.visibility = View.GONE
+        tvInstruction.text = ""
+        tvStepDistance.text = ""
+        tvEta.text = ""
+
+        // Restaurar inputs
+        etOrigin.visibility = View.VISIBLE
+        etDestination.visibility = View.VISIBLE
+        btnRoute.visibility = View.VISIBLE
+
+        etDestination.isEnabled = true
+        etDestination.text.clear()
+        etOrigin.text.clear()
+
+        // Botón cancelar
+        findViewById<View>(R.id.btnCancelRoute).visibility = View.GONE
+
+        toast("Ruta cancelada")
+    }
+
     private fun drawRoute(json: String) {
         if (!mapReady) return
 
         val route = JSONObject(json)
             .getJSONArray("routes")
             .getJSONObject(0)
+
+
 
         // ================= DISTANCIA / ETA =================
 
@@ -426,7 +551,7 @@ class MainActivity : AppCompatActivity() {
 
         tvEta.text = formatTime(distanceKm, durationMin)
         navigationBar.visibility = LinearLayout.VISIBLE
-        navigating = true
+        onNavigationStarted()
         arrived = false
 
         // ================= GEOMETRÍA RUTA =================
