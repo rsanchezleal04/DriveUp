@@ -271,8 +271,9 @@ class MainActivity : AppCompatActivity() {
         val btnCancelRoute = findViewById<Button>(R.id.btnCancelRoute)
 
         btnCancelRoute.setOnClickListener {
-            cancelRoute()
+            confirmCancelRoute()
         }
+
 
     }
 
@@ -493,7 +494,7 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    private fun cancelRoute() {
+    /*private fun cancelRoute() {
 
         if (!navigating) return
 
@@ -529,7 +530,56 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnCancelRoute).visibility = View.GONE
 
         toast("Ruta cancelada")
+    }*/
+
+    private fun confirmCancelRoute() {
+        AlertDialog.Builder(this)
+            .setTitle("Cancelar ruta")
+            .setMessage("¿Quieres cancelar el viaje actual?")
+            .setPositiveButton("Sí") { _, _ ->
+                cancelRouteWithSummary()
+            }
+            .setNegativeButton("No", null)
+            .show()
     }
+
+    private fun cancelRouteWithSummary() {
+
+        if (!navigating) return
+
+        navigating = false
+        arrived = false
+
+        // Finalizar viaje
+        val tripResult = tripStatsManager.finishTrip()
+        saveTripResult(tripResult)
+
+        // Limpiar navegación
+        clearRoute()
+        navigationSteps = emptyList()
+        currentStepIndex = 0
+        destinationLatLng = null
+
+        // UI
+        navigationBar.visibility = View.GONE
+        tvInstruction.text = ""
+        tvStepDistance.text = ""
+        tvEta.text = ""
+
+        etOrigin.visibility = View.VISIBLE
+        etDestination.visibility = View.VISIBLE
+        btnRoute.visibility = View.VISIBLE
+
+        etDestination.isEnabled = true
+        etDestination.text.clear()
+        etOrigin.text.clear()
+
+        findViewById<View>(R.id.btnCancelRoute).visibility = View.GONE
+
+        showTripSummary(tripResult)
+    }
+
+
 
     private fun drawRoute(json: String) {
         if (!mapReady) return
@@ -1122,11 +1172,18 @@ private fun saveTripResult(tripResult: TripResult) {
         view.findViewById<TextView>(R.id.tvPoints).text =
             "Puntos ganados: ${tripResult.pointsEarned}"
 
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
             .setView(view)
-            .setPositiveButton("Aceptar", null)
-            .show()
+            .setCancelable(false)
+            .create()
+
+        view.findViewById<Button>(R.id.btnContinue).setOnClickListener {
+            dialog.dismiss()
+        }
+
+        dialog.show()
     }
+
 
 
 
