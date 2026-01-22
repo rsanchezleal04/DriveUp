@@ -73,6 +73,9 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var etDestination: AutoCompleteTextView
     private lateinit var btnRoute: Button
+
+    private lateinit var btnPreviewRoute: Button
+
     private lateinit var btnCenter: ImageButton
     private lateinit var tvEta: TextView
     private lateinit var tvInstruction: TextView
@@ -86,6 +89,9 @@ class MainActivity : AppCompatActivity() {
     private var routePoints: List<LatLng> = emptyList()
     private var destinationLatLng: LatLng? = null
     private var navigating = false
+
+    private var previewing = false
+
     private var firstZoomDone = false
     private var mapReady = false
 
@@ -147,6 +153,7 @@ class MainActivity : AppCompatActivity() {
         etDestination = findViewById(R.id.etDestination)
 
         btnRoute = findViewById(R.id.btnRoute)
+        btnPreviewRoute = findViewById(R.id.btnPreviewRoute)
         btnCenter = findViewById(R.id.btnCenterLocation)
         tvEta = findViewById(R.id.tvEta)
         tvInstruction = findViewById(R.id.tvInstruction)
@@ -183,6 +190,15 @@ class MainActivity : AppCompatActivity() {
             calculateRoute()
         }
 
+        btnPreviewRoute.setOnClickListener {
+            if (previewing) {
+                exitPreview()
+            } else {
+                previewRoute()
+            }
+        }
+
+
         btnCenter.setOnClickListener {
             centerToUserLocation()
         }
@@ -192,11 +208,8 @@ class MainActivity : AppCompatActivity() {
             updateMuteIcon()
         }
 
-        // ================= TTS =================
-        tts = TextToSpeech(this) {
-            if (it == TextToSpeech.SUCCESS) {
-                tts.language = Locale("es", "ES")
-            }
+        findViewById<Button>(R.id.btnCancelRoute).setOnClickListener {
+            confirmCancelRoute()
         }
 
         val btnSettings = findViewById<ImageButton>(R.id.btnSettings)
@@ -204,78 +217,18 @@ class MainActivity : AppCompatActivity() {
             showSettingsMenu(it)
         }
 
-        // =====================================================
-        // AUTOCOMPLETADO DESTINO (Geoapify - GRATIS)
-        // =====================================================
-
-        var searchJob: Job? = null
-        val client = OkHttpClient()
-
-        etDestination.addTextChangedListener(object : TextWatcher {
-
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                if (!etDestination.isEnabled) return
-                val query = s.toString().trim()
-                if (query.length < 3) return
-
-                searchJob?.cancel()
-                searchJob = lifecycleScope.launch(Dispatchers.IO) {
-                    delay(300) // debounce para no saturar API
-
-                    try {
-                        val url =
-                            "https://api.geoapify.com/v1/geocode/autocomplete" +
-                                    "?text=${URLEncoder.encode(query, "UTF-8")}" +
-                                    "&lang=es" +
-                                    "&limit=5" +
-                                    "&apiKey=bfde33420b5842fea5085295622148e9" // <--- Pon aquí tu API Key válida
-
-                        val request = Request.Builder().url(url).build()
-                        val response = client.newCall(request).execute()
-                        val body = response.body?.string() ?: return@launch
-
-                        val suggestions = mutableListOf<String>()
-                        val json = JSONObject(body)
-                        val features = json.optJSONArray("features") ?: JSONArray()
-
-                        for (i in 0 until features.length()) {
-                            val props = features.getJSONObject(i).getJSONObject("properties")
-                            suggestions.add(props.getString("formatted"))
-                        }
-
-                        withContext(Dispatchers.Main) {
-                            val adapter = ArrayAdapter(
-                                this@MainActivity,
-                                android.R.layout.simple_dropdown_item_1line,
-                                suggestions
-                            )
-                            etDestination.setAdapter(adapter)
-                            etDestination.showDropDown()
-                        }
-                    } catch (e: Exception) {
-                        // Evitar crasheos si falla la API
-                        e.printStackTrace()
-                    }
-                }
+        // ================= TTS =================
+        tts = TextToSpeech(this) {
+            if (it == TextToSpeech.SUCCESS) {
+                tts.language = Locale("es", "ES")
             }
-        })
-
-        etDestination.setOnItemClickListener { parent, _, position, _ ->
-            val selected = parent.getItemAtPosition(position) as String
-            etDestination.setText(selected)
-            etDestination.setSelection(selected.length)
         }
 
-        val btnCancelRoute = findViewById<Button>(R.id.btnCancelRoute)
-
-        btnCancelRoute.setOnClickListener {
-            confirmCancelRoute()
-        }
-
-
+        // ================= AUTOCOMPLETADO =================
+        setupAutocomplete(etDestination)
+        setupAutocomplete(etOrigin)
     }
+
 
 
     // ================= PERMISOS =================
@@ -441,25 +394,24 @@ class MainActivity : AppCompatActivity() {
 
     private fun calculateRoute() {
         val destText = etDestination.text.toString().trim()
-        val originText = etOrigin.text.toString().trim()
-
         if (destText.isEmpty()) return
 
         lifecycleScope.launch(Dispatchers.IO) {
 
-            val originLatLng: LatLng = if (originText.isEmpty()) {
-                val loc = currentLocation ?: return@launch
-                LatLng(loc.latitude, loc.longitude)
-            } else {
-                geocode(originText) ?: return@launch
-            }
+            val loc = currentLocation ?: return@launch
+            val originLatLng = LatLng(loc.latitude, loc.longitude)
 
             val dest = geocode(destText) ?: return@launch
+
+            // Estados
+            previewing = false
+            navigating = true
 
             destinationLatLng = dest
             fetchRoute(originLatLng, dest)
         }
     }
+
 
 
     private fun fetchRoute(o: LatLng, d: LatLng) {
@@ -491,7 +443,7 @@ class MainActivity : AppCompatActivity() {
         etDestination.isEnabled = false
 
         findViewById<View>(R.id.btnCancelRoute).visibility = View.VISIBLE
-
+        btnPreviewRoute.visibility = View.GONE
     }
 
     /*private fun cancelRoute() {
@@ -533,6 +485,12 @@ class MainActivity : AppCompatActivity() {
     }*/
 
     private fun confirmCancelRoute() {
+
+        if (previewing) {
+            exitPreview()
+            return
+        }
+
         AlertDialog.Builder(this)
             .setTitle("Cancelar ruta")
             .setMessage("¿Quieres cancelar el viaje actual?")
@@ -542,6 +500,7 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("No", null)
             .show()
     }
+
 
     private fun cancelRouteWithSummary() {
 
@@ -576,6 +535,7 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<View>(R.id.btnCancelRoute).visibility = View.GONE
 
+        btnPreviewRoute.visibility = View.VISIBLE
         showTripSummary(tripResult)
     }
 
@@ -588,21 +548,16 @@ class MainActivity : AppCompatActivity() {
             .getJSONArray("routes")
             .getJSONObject(0)
 
-
-
         // ================= DISTANCIA / ETA =================
 
-        val distanceKm = route.getDouble("distance") / 1000
-        val durationMin = route.getDouble("duration") / 60
-        tripStatsManager.startTrip(
-            optimalDistanceMeters = route.getDouble("distance"),
-            optimalDurationSeconds = route.getDouble("duration")
-        )
+        val distanceMeters = route.getDouble("distance")
+        val durationSeconds = route.getDouble("duration")
+
+        val distanceKm = distanceMeters / 1000
+        val durationMin = durationSeconds / 60
 
         tvEta.text = formatTime(distanceKm, durationMin)
-        navigationBar.visibility = LinearLayout.VISIBLE
-        onNavigationStarted()
-        arrived = false
+        navigationBar.visibility = View.VISIBLE
 
         // ================= GEOMETRÍA RUTA =================
 
@@ -635,7 +590,24 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // ================= INSTRUCCIONES DE GIRO =================
+        // ================= SI ES PREVIEW, TERMINAMOS AQUÍ =================
+        if (previewing) {
+            tvInstruction.text = "Vista previa de la ruta"
+            tvStepDistance.text = ""
+            return
+        }
+
+        // ================= NAVEGACIÓN REAL (COMO ANTES) =================
+
+        tripStatsManager.startTrip(
+            optimalDistanceMeters = distanceMeters,
+            optimalDurationSeconds = durationSeconds
+        )
+
+        onNavigationStarted()
+        arrived = false
+
+        // ================= INSTRUCCIONES =================
 
         val legs = route.getJSONArray("legs")
         val stepsJson = legs.getJSONObject(0).getJSONArray("steps")
@@ -676,7 +648,6 @@ class MainActivity : AppCompatActivity() {
         if (navigationSteps.isNotEmpty()) {
             tvInstruction.text = navigationSteps[0].instruction
             updateTurnIcon(navigationSteps[0].instruction)
-
         }
     }
 
@@ -801,6 +772,8 @@ class MainActivity : AppCompatActivity() {
         toast("Has llegado a tu destino")
 
         clearRoute()
+        btnPreviewRoute.visibility = View.VISIBLE
+
         val tripResult = tripStatsManager.finishTrip()
         saveTripResult(tripResult)
         showTripSummary(tripResult)
@@ -814,8 +787,6 @@ class MainActivity : AppCompatActivity() {
         navigationSteps = emptyList()
         currentStepIndex = 0
         tvInstruction.text = ""
-
-
     }
 
     private fun clearRoute() {
@@ -1185,6 +1156,46 @@ private fun saveTripResult(tripResult: TripResult) {
     }
 
 
+    //=================== VER RUTA ================================
+    private fun previewRoute() {
+        val destText = etDestination.text.toString().trim()
+        val originText = etOrigin.text.toString().trim()
+
+        if (destText.isEmpty()) {
+            toast("Selecciona un destino")
+            return
+        }
+
+        lifecycleScope.launch(Dispatchers.IO) {
+
+            val origin: LatLng = if (originText.isEmpty()) {
+                val loc = currentLocation
+                if (loc == null) {
+                    withContext(Dispatchers.Main) {
+                        toast("No se puede obtener ubicación actual")
+                    }
+                    return@launch
+                } else LatLng(loc.latitude, loc.longitude)
+            } else {
+                geocode(originText) ?: return@launch
+            }
+
+            val dest = geocode(destText) ?: return@launch
+
+            // Cambiamos estado
+            previewing = true
+            navigating = false
+
+            destinationLatLng = dest
+
+            // Cambiar texto del botón
+            withContext(Dispatchers.Main) {
+                btnPreviewRoute.text = "Dejar de ver ruta"
+            }
+
+            fetchRoute(origin, dest)
+        }
+    }
 
 
 
@@ -1203,6 +1214,79 @@ private fun saveTripResult(tripResult: TripResult) {
 
         window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         tts.shutdown()
+    }
+
+    private fun exitPreview() {
+        previewing = false
+
+        clearRoute()
+        routePoints = emptyList()
+
+        navigationBar.visibility = View.GONE
+        tvEta.text = ""
+        tvInstruction.text = ""
+        tvStepDistance.text = ""
+
+        btnPreviewRoute.text = "Ver ruta"
+
+        toast("Vista previa cancelada")
+    }
+
+
+    //======================= AUTOCOMPLETADO ===============================
+    private fun setupAutocomplete(editText: AutoCompleteTextView) {
+        var searchJob: Job? = null
+
+        editText.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+
+            override fun afterTextChanged(s: Editable?) {
+                if (!editText.isEnabled) return
+                val query = s.toString().trim()
+                if (query.length < 3) return
+
+                searchJob?.cancel()
+                searchJob = lifecycleScope.launch(Dispatchers.IO) {
+                    delay(300)
+
+                    try {
+                        val url =
+                            "https://api.geoapify.com/v1/geocode/autocomplete" +
+                                    "?text=${URLEncoder.encode(query, "UTF-8")}" +
+                                    "&lang=es&limit=5&apiKey=bfde33420b5842fea5085295622148e9"
+
+                        val request = Request.Builder().url(url).build()
+                        val response = client.newCall(request).execute()
+                        val body = response.body?.string() ?: return@launch
+
+                        val suggestions = mutableListOf<String>()
+                        val features = JSONObject(body).optJSONArray("features") ?: JSONArray()
+
+                        for (i in 0 until features.length()) {
+                            val props = features.getJSONObject(i).getJSONObject("properties")
+                            suggestions.add(props.getString("formatted"))
+                        }
+
+                        withContext(Dispatchers.Main) {
+                            val adapter = ArrayAdapter(
+                                this@MainActivity,
+                                android.R.layout.simple_dropdown_item_1line,
+                                suggestions
+                            )
+                            editText.setAdapter(adapter)
+                            editText.showDropDown()
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+        })
+
+        editText.setOnItemClickListener { parent, _, position, _ ->
+            val selected = parent.getItemAtPosition(position) as String
+            editText.setText(selected)
+            editText.setSelection(selected.length)
+        }
     }
 
 

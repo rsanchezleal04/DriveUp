@@ -132,6 +132,16 @@
             android:textStyle="bold"/>
 
         <Button
+            android:id="@+id/btnPreviewRoute"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Ver ruta"
+            android:layout_marginTop="4dp"
+            android:backgroundTint="@color/driveup_orange"
+            android:textColor="@android:color/white"/>
+
+
+        <Button
             android:id="@+id/btnCancelRoute"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
