@@ -2,9 +2,7 @@ package com.example.driveup
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Button
-import android.widget.EditText
-import android.widget.Toast
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -19,17 +17,20 @@ class LoginActivity : AppCompatActivity() {
 
         auth = FirebaseAuth.getInstance()
 
-        // 🔥 Si ya hay sesión activa → Main
         val currentUser = auth.currentUser
         if (currentUser != null) {
-            checkUserInFirestore(currentUser.uid)
+            if (currentUser.isEmailVerified) {
+                checkUserInFirestore(currentUser.uid)
+            } else {
+                auth.signOut()
+                toast("Verifica tu email antes de entrar")
+            }
             return
         }
 
-
         setContentView(R.layout.activity_login)
 
-        val etUser = findViewById<EditText>(R.id.etEmail) // email o username
+        val etUser = findViewById<EditText>(R.id.etEmail)
         val etPassword = findViewById<EditText>(R.id.etPassword)
         val btnLogin = findViewById<Button>(R.id.btnLogin)
         val btnRegister = findViewById<Button>(R.id.btnRegister)
@@ -49,22 +50,22 @@ class LoginActivity : AppCompatActivity() {
         btnRegister.setOnClickListener {
             startActivity(Intent(this, RegisterActivity::class.java))
         }
+
     }
 
-    // 🔐 LOGIN CON EMAIL O USERNAME
     private fun login(input: String, pass: String) {
 
-        // Caso 1 → email
         if (input.contains("@")) {
             auth.signInWithEmailAndPassword(input, pass)
-                .addOnSuccessListener { goToMain() }
+                .addOnSuccessListener {
+                    handlePostLogin()
+                }
                 .addOnFailureListener {
                     toast("Credenciales incorrectas")
                 }
             return
         }
 
-        // Caso 2 → username
         db.collection("users")
             .whereEqualTo("username", input)
             .limit(1)
@@ -75,14 +76,12 @@ class LoginActivity : AppCompatActivity() {
                     return@addOnSuccessListener
                 }
 
-                val email = snap.documents[0].getString("email")
-                if (email == null) {
-                    toast("Error interno")
-                    return@addOnSuccessListener
-                }
+                val email = snap.documents[0].getString("email") ?: return@addOnSuccessListener
 
                 auth.signInWithEmailAndPassword(email, pass)
-                    .addOnSuccessListener { goToMain() }
+                    .addOnSuccessListener {
+                        handlePostLogin()
+                    }
                     .addOnFailureListener {
                         toast("Credenciales incorrectas")
                     }
@@ -90,6 +89,18 @@ class LoginActivity : AppCompatActivity() {
             .addOnFailureListener {
                 toast("Error al iniciar sesión")
             }
+    }
+
+    private fun handlePostLogin() {
+        val user = auth.currentUser ?: return
+
+        if (!user.isEmailVerified) {
+            toast("Verifica tu email antes de entrar")
+            auth.signOut()
+            return
+        }
+
+        checkUserInFirestore(user.uid)
     }
 
     private fun checkUserInFirestore(uid: String) {
@@ -100,7 +111,6 @@ class LoginActivity : AppCompatActivity() {
                 if (doc.exists()) {
                     goToMain()
                 } else {
-                    // 🔥 Usuario Auth existe pero Firestore NO → sesión inválida
                     auth.signOut()
                     toast("Tu cuenta ya no existe. Regístrate de nuevo.")
                 }

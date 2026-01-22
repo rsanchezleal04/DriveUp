@@ -139,6 +139,13 @@ class MainActivity : AppCompatActivity() {
         mapView = findViewById(R.id.mapView)
         etOrigin = findViewById(R.id.etOrigin)
         etDestination = findViewById(R.id.etDestination)
+        // Limpiar "Destino" al tocar el campo
+        etDestination.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus && etDestination.text.toString().equals("Destino", true)) {
+                etDestination.text.clear()
+            }
+        }
+
         btnRoute = findViewById(R.id.btnRoute)
         btnCenter = findViewById(R.id.btnCenterLocation)
         tvEta = findViewById(R.id.tvEta)
@@ -616,7 +623,7 @@ class MainActivity : AppCompatActivity() {
         arrived = true
         navigating = false
 
-        toast("Has llegado a tu destino 🚗")
+        toast("Has llegado a tu destino")
 
         clearRoute()
         val tripResult = tripStatsManager.finishTrip()
@@ -720,8 +727,8 @@ class MainActivity : AppCompatActivity() {
 
             "roundabout" -> "⟳ Entra en la rotonda$street"
 
-            "depart" -> "🚗 Comienza la ruta"
-            "arrive" -> "🏁 Has llegado a tu destino"
+            "depart" -> "Comienza la ruta"
+            "arrive" -> "Has llegado a tu destino"
 
             else -> "Continúa$street"
         }

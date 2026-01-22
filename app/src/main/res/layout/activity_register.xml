@@ -24,6 +24,13 @@
             android:layout_height="wrap_content"/>
 
         <EditText
+            android:id="@+id/etConfirmPassword"
+            android:hint="Confirmar Contraseña"
+            android:inputType="textPassword"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+        <EditText
             android:id="@+id/etUsername"
             android:hint="Nombre de usuario"
             android:layout_width="match_parent"
