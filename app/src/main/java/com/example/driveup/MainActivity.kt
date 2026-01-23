@@ -1248,18 +1248,22 @@ private fun saveTripResult(tripResult: TripResult) {
     private fun setupAutocomplete(editText: AutoCompleteTextView) {
         var searchJob: Job? = null
 
+        // Cuando el usuario cambia el texto
         editText.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
 
             override fun afterTextChanged(s: Editable?) {
-                if (!editText.isEnabled) return
+                if (!editText.isEnabled || !editText.isFocused) return // Solo si está activo
                 val query = s.toString().trim()
-                if (query.length < 3) return
+                if (query.length < 3) {
+                    editText.dismissDropDown() // Si no hay suficiente texto, cerramos dropdown
+                    return
+                }
 
                 searchJob?.cancel()
                 searchJob = lifecycleScope.launch(Dispatchers.IO) {
-                    delay(300)
+                    delay(300) // Pequeño debounce para no saturar la API
 
                     try {
                         val url =
@@ -1286,19 +1290,31 @@ private fun saveTripResult(tripResult: TripResult) {
                                 suggestions
                             )
                             editText.setAdapter(adapter)
-                            editText.showDropDown()
+                            editText.showDropDown() // Mostramos sugerencias
                         }
                     } catch (_: Exception) {}
                 }
             }
         })
 
+        // Cuando el usuario selecciona un elemento del dropdown
         editText.setOnItemClickListener { parent, _, position, _ ->
             val selected = parent.getItemAtPosition(position) as String
             editText.setText(selected)
             editText.setSelection(selected.length)
+
+            // 🔹 Cerramos el autocompletado inmediatamente después de seleccionar
+            editText.post { editText.dismissDropDown() }
+        }
+
+        // 🔹 Cuando el usuario hace clic fuera, se cierra el dropdown
+        editText.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) editText.dismissDropDown()
         }
     }
+
+
+
 
     //================================ TIENDA =================================
     private fun updateStoreVisibility() {
