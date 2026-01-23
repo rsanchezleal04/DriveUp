@@ -8,5 +8,7 @@ data class User(
     val age: Int = 0,
     val gender: String = "",
     val points: Int = 0,
-    val totalKm: Double = 0.0
+    val totalKm: Double = 0.0,
+    val purchasedItems: List<String> = listOf(),
+    val codes: Map<String, String> = mapOf()
 )

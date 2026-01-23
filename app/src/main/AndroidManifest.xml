@@ -57,9 +57,9 @@
             android:screenOrientation="portrait"
             android:configChanges="orientation|screenSize" />
 
-        <!-- 🟣 POINTS -->
+        <!-- STORE -->
         <activity
-            android:name=".PointsActivity"
+            android:name=".StoreActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
 

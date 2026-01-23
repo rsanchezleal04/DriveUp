@@ -82,6 +82,27 @@
         app:layout_constraintBottom_toTopOf="@id/navigationBar"
         app:layout_constraintEnd_toEndOf="parent"/>
 
+    <!-- 🏪 BOTÓN TIENDA CON CÍRCULO BLANCO -->
+    <FrameLayout
+        android:id="@+id/storeButtonContainer"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:layout_margin="16dp"
+        android:background="@drawable/circle_white_background"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <ImageButton
+            android:id="@+id/btnStore"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_gravity="center"
+            android:background="@android:color/transparent"
+            android:src="@drawable/ic_store"
+            android:contentDescription="Tienda"
+            app:tint="@color/driveup_orange"/>
+    </FrameLayout>
+
     <!-- CONTENEDOR SUPERIOR -->
     <LinearLayout
         android:id="@+id/topContainer"
@@ -139,7 +160,6 @@
             android:layout_marginTop="4dp"
             android:backgroundTint="@color/driveup_orange"
             android:textColor="@android:color/white"/>
-
 
         <Button
             android:id="@+id/btnCancelRoute"
@@ -207,6 +227,7 @@
             android:textSize="16sp"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"/>
+
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -133,6 +133,9 @@ class MainActivity : AppCompatActivity() {
 
     private val db = FirebaseFirestore.getInstance()
 
+    private lateinit var btnStore: ImageButton
+
+
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -207,6 +210,14 @@ class MainActivity : AppCompatActivity() {
             voiceEnabled = !voiceEnabled
             updateMuteIcon()
         }
+
+        btnStore = findViewById(R.id.btnStore)
+
+        btnStore.setOnClickListener {
+            startActivity(Intent(this, StoreActivity::class.java))
+        }
+
+
 
         findViewById<Button>(R.id.btnCancelRoute).setOnClickListener {
             confirmCancelRoute()
@@ -429,6 +440,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun onNavigationStarted() {
         navigating = true
+        updateStoreVisibility()
 
         // Ocultar inputs
         etOrigin.clearFocus()
@@ -508,6 +520,8 @@ class MainActivity : AppCompatActivity() {
 
         navigating = false
         arrived = false
+        updateStoreVisibility()
+
 
         // Finalizar viaje
         val tripResult = tripStatsManager.finishTrip()
@@ -768,6 +782,8 @@ class MainActivity : AppCompatActivity() {
     private fun onArrived() {
         arrived = true
         navigating = false
+        updateStoreVisibility()
+
 
         toast("Has llegado a tu destino")
 
@@ -1057,11 +1073,6 @@ class MainActivity : AppCompatActivity() {
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
 
-                R.id.action_points -> {
-                    startActivity(Intent(this, PointsActivity::class.java))
-                    true
-                }
-
                 R.id.action_logout -> {
                     confirmLogout()
                     true
@@ -1289,7 +1300,11 @@ private fun saveTripResult(tripResult: TripResult) {
         }
     }
 
-
+    //================================ TIENDA =================================
+    private fun updateStoreVisibility() {
+        btnStore.visibility =
+            if (!navigating && !previewing) View.VISIBLE else View.GONE
+    }
 
 
     private fun toast(msg: String) =
