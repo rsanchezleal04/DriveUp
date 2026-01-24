@@ -48,13 +48,7 @@ import java.net.URLEncoder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-
-
-
-
-
-
-
+import android.view.inputmethod.InputMethodManager
 
 data class NavigationStep(
     val instruction: String,
@@ -293,20 +287,29 @@ class MainActivity : AppCompatActivity() {
         ) return
 
         val request = LocationRequest.Builder(
-            Priority.PRIORITY_HIGH_ACCURACY, 2000
-        ).build()
+            Priority.PRIORITY_HIGH_ACCURACY, 500
+        )
+            .setMinUpdateIntervalMillis(300)
+            .setMinUpdateDistanceMeters(0f)
+            .build()
+
 
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 val loc = result.lastLocation ?: return
+
                 currentLocation = loc
                 updateCameraFollowingCar(loc)
                 tripStatsManager.onLocationUpdate(loc)
 
+                val speed = if (loc.hasSpeed()) {
+                    speedManager.update(loc)
+                } else {
+                    speedManager.getCurrentSpeed()
+                }
 
+                tvSpeed.text = "$speed"
 
-                val speed = speedManager.update(loc)
-                tvSpeed.text = speed.toString()
 
                 zoomToLocationOnce(loc)
 
@@ -803,6 +806,10 @@ class MainActivity : AppCompatActivity() {
         navigationSteps = emptyList()
         currentStepIndex = 0
         tvInstruction.text = ""
+
+        speedManager.reset()
+        tvSpeed.text = "0"
+
     }
 
     private fun clearRoute() {
@@ -1246,24 +1253,41 @@ private fun saveTripResult(tripResult: TripResult) {
 
     //======================= AUTOCOMPLETADO ===============================
     private fun setupAutocomplete(editText: AutoCompleteTextView) {
-        var searchJob: Job? = null
 
-        // Cuando el usuario cambia el texto
+        var searchJob: Job? = null
+        var autocompleteLocked = false
+
+        // ================= CAMBIO DE TEXTO =================
         editText.addTextChangedListener(object : TextWatcher {
+
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                // Si el usuario escribe o borra → desbloqueamos autocomplete
+                if (before > 0 || count > 0) {
+                    autocompleteLocked = false
+                }
+            }
 
             override fun afterTextChanged(s: Editable?) {
-                if (!editText.isEnabled || !editText.isFocused) return // Solo si está activo
+
+                // No buscamos si:
+                // - no tiene foco
+                // - está bloqueado
+                if (!editText.isFocused || autocompleteLocked) return
+
                 val query = s.toString().trim()
+
+                // Muy corto → nada de sugerencias
                 if (query.length < 3) {
-                    editText.dismissDropDown() // Si no hay suficiente texto, cerramos dropdown
+                    editText.dismissDropDown()
                     return
                 }
 
+                // Cancelamos búsquedas anteriores
                 searchJob?.cancel()
                 searchJob = lifecycleScope.launch(Dispatchers.IO) {
-                    delay(300) // Pequeño debounce para no saturar la API
+                    delay(300) // debounce
 
                     try {
                         val url =
@@ -1290,31 +1314,61 @@ private fun saveTripResult(tripResult: TripResult) {
                                 suggestions
                             )
                             editText.setAdapter(adapter)
-                            editText.showDropDown() // Mostramos sugerencias
+
+                            if (!autocompleteLocked && editText.isFocused) {
+                                editText.showDropDown()
+                            }
                         }
+
                     } catch (_: Exception) {}
                 }
             }
         })
 
-        // Cuando el usuario selecciona un elemento del dropdown
+        // ================= SELECCIÓN DE SUGERENCIA =================
         editText.setOnItemClickListener { parent, _, position, _ ->
+
             val selected = parent.getItemAtPosition(position) as String
+
+            autocompleteLocked = true
             editText.setText(selected)
             editText.setSelection(selected.length)
 
-            // 🔹 Cerramos el autocompletado inmediatamente después de seleccionar
-            editText.post { editText.dismissDropDown() }
+            editText.dismissDropDown()
+            editText.clearFocus()
+            hideKeyboard(editText)
         }
 
-        // 🔹 Cuando el usuario hace clic fuera, se cierra el dropdown
+        // ================= ENTER / ✓ DEL TECLADO =================
+        editText.setOnEditorActionListener { _, _, _ ->
+            autocompleteLocked = true
+            editText.dismissDropDown()
+            editText.clearFocus()
+            hideKeyboard(editText)
+            true
+        }
+
+        // ================= CLICK EN EL CAMPO =================
+        // Permite volver a escribir si el usuario se equivocó
+        editText.setOnClickListener {
+            autocompleteLocked = false
+            editText.requestFocus()
+        }
+
+        // ================= CLICK FUERA =================
         editText.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) editText.dismissDropDown()
+            if (!hasFocus) {
+                editText.dismissDropDown()
+            }
         }
     }
 
 
 
+    private fun hideKeyboard(view: View) {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(view.windowToken, 0)
+    }
 
     //================================ TIENDA =================================
     private fun updateStoreVisibility() {
