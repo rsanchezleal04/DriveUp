@@ -2,6 +2,8 @@ package com.example.driveup
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
@@ -11,6 +13,9 @@ class LoginActivity : AppCompatActivity() {
 
     private lateinit var auth: FirebaseAuth
     private val db = FirebaseFirestore.getInstance()
+
+    private lateinit var etUser: EditText
+    private lateinit var etPassword: EditText
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,39 +35,61 @@ class LoginActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_login)
 
-        val etUser = findViewById<EditText>(R.id.etEmail)
-        val etPassword = findViewById<EditText>(R.id.etPassword)
+        etUser = findViewById(R.id.etEmail)
+        etPassword = findViewById(R.id.etPassword)
         val btnLogin = findViewById<Button>(R.id.btnLogin)
         val btnRegister = findViewById<Button>(R.id.btnRegister)
 
-        btnLogin.setOnClickListener {
-            val input = etUser.text.toString().trim()
-            val pass = etPassword.text.toString().trim()
-
-            if (input.isEmpty() || pass.isEmpty()) {
-                toast("Introduce usuario/email y contraseña")
-                return@setOnClickListener
+        // ===== ENTER EN USERNAME → PASA A PASSWORD =====
+        etUser.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_NEXT) {
+                etPassword.requestFocus()
+                true
+            } else {
+                false
             }
+        }
 
-            login(input, pass)
+        // ===== ENTER EN PASSWORD → LOGIN =====
+        etPassword.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                hideKeyboard()
+                doLogin()
+                true
+            } else {
+                false
+            }
+        }
+
+        btnLogin.setOnClickListener {
+            hideKeyboard()
+            doLogin()
         }
 
         btnRegister.setOnClickListener {
             startActivity(Intent(this, RegisterActivity::class.java))
         }
+    }
 
+    // ===== LÓGICA DE LOGIN =====
+    private fun doLogin() {
+        val input = etUser.text.toString().trim()
+        val pass = etPassword.text.toString().trim()
+
+        if (input.isEmpty() || pass.isEmpty()) {
+            toast("Introduce usuario/email y contraseña")
+            return
+        }
+
+        login(input, pass)
     }
 
     private fun login(input: String, pass: String) {
 
         if (input.contains("@")) {
             auth.signInWithEmailAndPassword(input, pass)
-                .addOnSuccessListener {
-                    handlePostLogin()
-                }
-                .addOnFailureListener {
-                    toast("Credenciales incorrectas")
-                }
+                .addOnSuccessListener { handlePostLogin() }
+                .addOnFailureListener { toast("Credenciales incorrectas") }
             return
         }
 
@@ -79,12 +106,8 @@ class LoginActivity : AppCompatActivity() {
                 val email = snap.documents[0].getString("email") ?: return@addOnSuccessListener
 
                 auth.signInWithEmailAndPassword(email, pass)
-                    .addOnSuccessListener {
-                        handlePostLogin()
-                    }
-                    .addOnFailureListener {
-                        toast("Credenciales incorrectas")
-                    }
+                    .addOnSuccessListener { handlePostLogin() }
+                    .addOnFailureListener { toast("Credenciales incorrectas") }
             }
             .addOnFailureListener {
                 toast("Error al iniciar sesión")
@@ -121,7 +144,6 @@ class LoginActivity : AppCompatActivity() {
             }
     }
 
-
     private fun goToMain() {
         startActivity(Intent(this, MainActivity::class.java))
         finish()
@@ -129,5 +151,12 @@ class LoginActivity : AppCompatActivity() {
 
     private fun toast(msg: String) {
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+    }
+
+    // ===== CERRAR TECLADO =====
+    private fun hideKeyboard() {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        val view = currentFocus ?: return
+        imm.hideSoftInputFromWindow(view.windowToken, 0)
     }
 }

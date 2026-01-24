@@ -49,30 +49,34 @@ class TripStatsManager {
 
     // FINALIZAR VIAJE
     fun finishTrip(): TripResult {
-        if (!tripActive) {
-            return TripResult.EMPTY
-        }
-
+        if (!tripActive) return TripResult.EMPTY
         tripActive = false
 
         val realTimeSeconds =
             max(1.0, (System.currentTimeMillis() - tripStartTime) / 1000.0)
 
-        val optimalSpeed = optimalDistanceMeters / optimalDurationSeconds
-        val realSpeed = realDistanceMeters / realTimeSeconds
+        val realKm = realDistanceMeters / 1000.0
+        val realHours = realTimeSeconds / 3600.0
+        val optimalHours = optimalDurationSeconds / 3600.0
 
-        val ratio = realSpeed / optimalSpeed
+        // ===== VELOCIDADES =====
+        val idealSpeed = realKm / optimalHours
+        val idealSpeedWithMargin = idealSpeed + 5.0
+        val realSpeed = realKm / realHours
 
+        val ratio = realSpeed / idealSpeedWithMargin
+
+        // ===== MULTIPLICADOR =====
         val multiplier = when {
+            ratio < 0.5 -> 0.0
             ratio <= 1.0 -> 1.0
-            ratio <= 1.10 -> 0.9
+            ratio <= 1.10 -> 0.75
             ratio <= 1.20 -> 0.5
             else -> 0.0
         }
 
-        val basePoints =
-            (optimalDistanceMeters / 1000.0) * POINTS_PER_KM
-
+        // ===== PUNTOS =====
+        val basePoints = realKm * POINTS_PER_KM
         val finalPoints = (basePoints * multiplier).toInt()
 
         return TripResult(
@@ -84,4 +88,5 @@ class TripStatsManager {
             pointsEarned = finalPoints
         )
     }
+
 }

@@ -28,6 +28,14 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content" />
 
+    <!-- 🔥 NUEVO -->
+    <TextView
+        android:id="@+id/tvEfficiency"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textStyle="bold" />
+
     <TextView
         android:id="@+id/tvPoints"
         android:textStyle="bold"
@@ -43,7 +51,6 @@
         android:text="Continuar"
         android:layout_marginTop="16dp"
         android:backgroundTint="@color/driveup_orange"
-        android:textColor="@android:color/white"/>
-
+        android:textColor="@android:color/white" />
 
 </LinearLayout>

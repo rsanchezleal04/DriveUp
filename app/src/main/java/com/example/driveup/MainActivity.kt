@@ -1142,13 +1142,20 @@ private fun saveTripResult(tripResult: TripResult) {
 
         val view = layoutInflater.inflate(R.layout.dialog_trip_summary, null)
 
+        // ================= CONVERSIONES =================
         val realKm = tripResult.realDistanceMeters / 1000.0
         val realHours = tripResult.realDurationSeconds / 3600.0
         val optimalHours = tripResult.optimalDurationSeconds / 3600.0
 
+        // ================= VELOCIDADES =================
         val realSpeed = realKm / realHours
         val optimalSpeed = realKm / optimalHours
 
+        // ================= EFICIENCIA (%) =================
+        // ratio viene ya calculado en TripResult
+        val efficiencyPercent = (tripResult.ratio * 100).toInt()
+
+        // ================= TEXTO =================
         view.findViewById<TextView>(R.id.tvDistance).text =
             "Distancia: %.2f km".format(realKm)
 
@@ -1158,9 +1165,13 @@ private fun saveTripResult(tripResult: TripResult) {
         view.findViewById<TextView>(R.id.tvRealSpeed).text =
             "Tu velocidad media: %.1f km/h".format(realSpeed)
 
+        view.findViewById<TextView>(R.id.tvEfficiency).text =
+            "Eficiencia del viaje: $efficiencyPercent%"
+
         view.findViewById<TextView>(R.id.tvPoints).text =
             "Puntos ganados: ${tripResult.pointsEarned}"
 
+        // ================= DIÁLOGO =================
         val dialog = AlertDialog.Builder(this)
             .setView(view)
             .setCancelable(false)
@@ -1172,6 +1183,7 @@ private fun saveTripResult(tripResult: TripResult) {
 
         dialog.show()
     }
+
 
 
     //=================== VER RUTA ================================

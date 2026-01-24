@@ -45,7 +45,10 @@ class StoreActivity : AppCompatActivity() {
             StoreItem("McFlurry Gratis", "Un mcflurry gratis", 2000),
             StoreItem("Descuento Repsol 10€", "10 euros de descuento en repsol", 20000),
             StoreItem("Esclavo negro", "Esclavo negro", 70000),
-            StoreItem("Pack Abalos + mujer", "Pack Abalos + mujer de compañía", 100000)
+            StoreItem("Pack Abalos + mujer", "Pack Abalos + mujer de compañía", 100000),
+            StoreItem("Amazon Prime", "1 mes de Amazon Prime", 4500),
+            StoreItem("Spotify Premium", "3 meses de Spotify Premium", 17000),
+            StoreItem("Uber 10€", "Cupón Uber de 10€", 28000)
         )
 
         // Adapter del RecyclerView
