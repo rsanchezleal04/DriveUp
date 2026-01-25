@@ -1,12 +1,14 @@
 package com.example.driveup.store
 
 import android.content.Context
+import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.example.driveup.R
 import com.google.firebase.auth.FirebaseAuth
@@ -21,6 +23,11 @@ class StoreAdapter(
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
+
+    // Color para productos comprados
+    private val purchasedColor = Color.parseColor("#73C2FB")
+    // Color para productos no comprados: color definido en colors.xml
+    private val normalColor = ContextCompat.getColor(context, R.color.driveup_orange)
 
     inner class StoreViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val tvName: TextView = view.findViewById(R.id.tvItemName)
@@ -41,6 +48,9 @@ class StoreAdapter(
         holder.tvName.text = item.name
         holder.tvPrice.text = "${item.price} pts"
         holder.btnBuy.text = if (item.purchased) "Ver código" else "Comprar"
+
+        // Cambiar color según si está comprado
+        holder.btnBuy.setBackgroundColor(if (item.purchased) purchasedColor else normalColor)
 
         holder.btnBuy.setOnClickListener {
             val uid = auth.currentUser?.uid ?: return@setOnClickListener
@@ -94,6 +104,7 @@ class StoreAdapter(
                         newPoints
                     }
                         .addOnSuccessListener { newPoints ->
+                            // Actualizar botón y color
                             notifyItemChanged(position)
                             onPointsUpdated(newPoints)
                         }
