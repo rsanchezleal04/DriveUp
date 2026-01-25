@@ -11,5 +11,5 @@ data class User(
     val totalKm: Double = 0.0,
     val purchasedItems: List<String> = listOf(),
     val codes: Map<String, String> = mapOf(),
-    val categories: Map<String, Int> = mapOf()
+    val categories: Map<String, Long> = mapOf()
 )

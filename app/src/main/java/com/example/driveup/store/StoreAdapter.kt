@@ -85,7 +85,8 @@ class StoreAdapter(
                         categories[item.category] = (categories[item.category] ?: 0) + 1
                         transaction.update(userRef, "categories", categories)
 
-                        val code = generateCouponCode()
+                        // ✅ USAR CÓDIGO DE FIRESTORE
+                        val code = item.code
                         codesMap[item.name] = code
                         transaction.update(userRef, "codes", codesMap)
 
@@ -110,12 +111,5 @@ class StoreAdapter(
         items.clear()
         items.addAll(newItems)
         notifyDataSetChanged()
-    }
-
-    private fun generateCouponCode(): String {
-        val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        return (1..4).joinToString("-") {
-            (1..4).map { chars.random() }.joinToString("")
-        }
     }
 }
