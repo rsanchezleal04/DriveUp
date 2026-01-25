@@ -12,18 +12,16 @@ import com.example.driveup.R
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
-// Adapter para mostrar los productos de la tienda
 class StoreAdapter(
     private val context: Context,
-    val items: List<StoreItem>,              // Lista de productos
-    private val codesMap: MutableMap<String, String>, // Códigos de productos en memoria
-    private val onPointsUpdated: (newPoints: Int) -> Unit // Callback para actualizar puntos
+    val items: List<StoreItem>,
+    private val codesMap: MutableMap<String, String>,
+    private val onPointsUpdated: (newPoints: Int) -> Unit
 ) : RecyclerView.Adapter<StoreAdapter.StoreViewHolder>() {
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
-    // ViewHolder representa un item de producto
     inner class StoreViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val tvName: TextView = view.findViewById(R.id.tvItemName)
         val tvPrice: TextView = view.findViewById(R.id.tvItemPrice)
@@ -40,11 +38,9 @@ class StoreAdapter(
     override fun onBindViewHolder(holder: StoreViewHolder, position: Int) {
         val item = items[position]
 
-        // Mostramos nombre y precio
         holder.tvName.text = item.name
         holder.tvPrice.text = "${item.price} pts"
 
-        // Botón según estado: Comprar o Ver código
         holder.btnBuy.text = if (item.purchased) "Ver código" else "Comprar"
         holder.btnBuy.isEnabled = true
 
@@ -52,72 +48,99 @@ class StoreAdapter(
             val uid = auth.currentUser?.uid ?: return@setOnClickListener
             val userRef = db.collection("users").document(uid)
 
+            // ================= VER CÓDIGO =================
             if (item.purchased) {
-                // Si ya comprado, mostramos código almacenado
                 val code = codesMap[item.name] ?: "No disponible"
                 android.app.AlertDialog.Builder(context)
                     .setTitle("Código de ${item.name}")
                     .setMessage("Tu código: $code")
-                    .setPositiveButton("Aceptar") { dialog, _ -> dialog.dismiss() }
+                    .setPositiveButton("Aceptar") { d, _ -> d.dismiss() }
                     .show()
                 return@setOnClickListener
             }
 
-            // Si no comprado, mostramos diálogo de confirmación con descripción y precio
-            val builder = android.app.AlertDialog.Builder(context)
-            builder.setTitle("Confirmar compra")
-            builder.setMessage("${item.description}\n\n¿Quieres gastar ${item.price} pts para comprar '${item.name}'?")
-            builder.setPositiveButton("Sí") { dialog, _ ->
+            // ================= CONFIRMACIÓN DE COMPRA =================
+            android.app.AlertDialog.Builder(context)
+                .setTitle("Confirmar compra")
+                .setMessage(
+                    "${item.description}\n\n" +
+                            "¿Quieres gastar ${item.price} pts?"
+                )
+                .setPositiveButton("Sí") { dialog, _ ->
 
-                // Transacción para restar puntos y marcar producto comprado
-                db.runTransaction { transaction ->
-                    val snapshot = transaction.get(userRef)
-                    val currentPoints = snapshot.getLong("points")?.toInt() ?: 0
-                    val purchasedItems = snapshot.get("purchasedItems") as? MutableList<String> ?: mutableListOf()
+                    db.runTransaction { transaction ->
 
-                    if (currentPoints >= item.price) {
+                        val snapshot = transaction.get(userRef)
+
+                        val currentPoints =
+                            snapshot.getLong("points")?.toInt() ?: 0
+
+                        val purchasedItems =
+                            snapshot.get("purchasedItems") as? MutableList<String>
+                                ?: mutableListOf()
+
+                        val categories =
+                            snapshot.get("categories") as? MutableMap<String, Long>
+                                ?: mutableMapOf()
+
+                        if (currentPoints < item.price) {
+                            throw Exception("No tienes suficientes puntos")
+                        }
+
+                        // ================= ACTUALIZACIONES =================
                         val newPoints = currentPoints - item.price
                         transaction.update(userRef, "points", newPoints)
 
                         purchasedItems.add(item.name)
                         transaction.update(userRef, "purchasedItems", purchasedItems)
 
-                        // Generamos código único y guardamos en memoria y Firestore
+                        // ---- Categorías (contador) ----
+                        val currentCount = categories[item.category] ?: 0
+                        categories[item.category] = currentCount + 1
+                        transaction.update(userRef, "categories", categories)
+
+                        // ---- Código ----
                         val code = generateCouponCode()
                         codesMap[item.name] = code
                         transaction.update(userRef, "codes", codesMap)
 
                         item.purchased = true
                         newPoints
-                    } else {
-                        throw Exception("No tienes suficientes puntos")
                     }
-                }.addOnSuccessListener { newPoints ->
-                    // Actualizamos UI
-                    notifyItemChanged(position)
-                    onPointsUpdated(newPoints)
+                        .addOnSuccessListener { newPoints ->
+                            notifyItemChanged(position)
+                            onPointsUpdated(newPoints)
 
-                    // Mostramos código generado
-                    val code = codesMap[item.name] ?: "No disponible"
-                    android.app.AlertDialog.Builder(context)
-                        .setTitle("Compra realizada")
-                        .setMessage("Has comprado '${item.name}'\nTu código: $code")
-                        .setPositiveButton("Aceptar") { dialog2, _ -> dialog2.dismiss() }
-                        .show()
-                }.addOnFailureListener { e ->
-                    Toast.makeText(context, e.message ?: "Error al comprar", Toast.LENGTH_SHORT).show()
+                            val code = codesMap[item.name] ?: "No disponible"
+                            android.app.AlertDialog.Builder(context)
+                                .setTitle("Compra realizada")
+                                .setMessage(
+                                    "Has comprado '${item.name}'\n\n"  +
+                                            "Tu código: $code"
+                                )
+                                .setPositiveButton("Aceptar") { d, _ -> d.dismiss() }
+                                .show()
+                        }
+                        .addOnFailureListener { e ->
+                            Toast.makeText(
+                                context,
+                                e.message ?: "Error al comprar",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+
+                    dialog.dismiss()
                 }
-
-                dialog.dismiss()
-            }
-            builder.setNegativeButton("No") { dialog, _ -> dialog.dismiss() }
-            builder.show()
+                .setNegativeButton("No") { d, _ -> d.dismiss() }
+                .show()
         }
     }
 
-    // Genera un código tipo XXXX-XXXX-XXXX-XXXX
+    // ================= CÓDIGO CUPÓN =================
     private fun generateCouponCode(): String {
         val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        return (1..4).joinToString("-") { (1..4).map { chars.random() }.joinToString("") }
+        return (1..4).joinToString("-") {
+            (1..4).map { chars.random() }.joinToString("")
+        }
     }
 }

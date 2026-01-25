@@ -41,14 +41,14 @@ class StoreActivity : AppCompatActivity() {
 
         // Lista de productos
         val items = listOf(
-            StoreItem("Carrefour 20%", "20% en carrefour. Hasta 100 euros", 15000),
-            StoreItem("McFlurry Gratis", "Un mcflurry gratis", 2000),
-            StoreItem("Descuento Repsol 10€", "10 euros de descuento en repsol", 20000),
-            StoreItem("Esclavo negro", "Esclavo negro", 70000),
-            StoreItem("Pack Abalos + mujer", "Pack Abalos + mujer de compañía", 100000),
-            StoreItem("Amazon Prime", "1 mes de Amazon Prime", 4500),
-            StoreItem("Spotify Premium", "3 meses de Spotify Premium", 17000),
-            StoreItem("Uber 10€", "Cupón Uber de 10€", 28000)
+            StoreItem("Carrefour 20%", "20% en carrefour. Hasta 100 euros", 15000, "Supermercado"),
+            StoreItem("McFlurry Gratis", "Un mcflurry gratis", 2000, "ComidaRapida"),
+            StoreItem("Descuento Repsol 10€", "10 euros de descuento en repsol", 20000, "Gasolina"),
+            StoreItem("Chandal Nike", "Chandal Nike Tech gratis", 70000, "Ropa"),
+            StoreItem("Entradas cinesa", "2 entradas gratis para cualquier cine Cinesa", 100000, "Ocio"),
+            StoreItem("Amazon Prime", "1 mes de Amazon Prime", 4500, "Ocio"),
+            StoreItem("Spotify Premium", "3 meses de Spotify Premium", 17000, "Ocio"),
+            StoreItem("Uber 10€", "Cupón Uber de 10€", 28000, "Transporte")
         )
 
         // Adapter del RecyclerView
