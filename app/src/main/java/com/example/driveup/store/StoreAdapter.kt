@@ -14,7 +14,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 
 class StoreAdapter(
     private val context: Context,
-    val items: List<StoreItem>,
+    val items: MutableList<StoreItem>,
     private val codesMap: MutableMap<String, String>,
     private val onPointsUpdated: (newPoints: Int) -> Unit
 ) : RecyclerView.Adapter<StoreAdapter.StoreViewHolder>() {
@@ -40,66 +40,51 @@ class StoreAdapter(
 
         holder.tvName.text = item.name
         holder.tvPrice.text = "${item.price} pts"
-
         holder.btnBuy.text = if (item.purchased) "Ver código" else "Comprar"
-        holder.btnBuy.isEnabled = true
 
         holder.btnBuy.setOnClickListener {
             val uid = auth.currentUser?.uid ?: return@setOnClickListener
             val userRef = db.collection("users").document(uid)
 
-            // ================= VER CÓDIGO =================
+            // ===== VER CÓDIGO =====
             if (item.purchased) {
                 val code = codesMap[item.name] ?: "No disponible"
                 android.app.AlertDialog.Builder(context)
                     .setTitle("Código de ${item.name}")
                     .setMessage("Tu código: $code")
-                    .setPositiveButton("Aceptar") { d, _ -> d.dismiss() }
+                    .setPositiveButton("Aceptar", null)
                     .show()
                 return@setOnClickListener
             }
 
-            // ================= CONFIRMACIÓN DE COMPRA =================
+            // ===== CONFIRMAR COMPRA =====
             android.app.AlertDialog.Builder(context)
                 .setTitle("Confirmar compra")
-                .setMessage(
-                    "${item.description}\n\n" +
-                            "¿Quieres gastar ${item.price} pts?"
-                )
-                .setPositiveButton("Sí") { dialog, _ ->
+                .setMessage("${item.description}\n\n¿Quieres gastar ${item.price} pts?")
+                .setPositiveButton("Sí") { _, _ ->
 
                     db.runTransaction { transaction ->
-
                         val snapshot = transaction.get(userRef)
 
-                        val currentPoints =
-                            snapshot.getLong("points")?.toInt() ?: 0
-
+                        val currentPoints = snapshot.getLong("points")?.toInt() ?: 0
                         val purchasedItems =
-                            snapshot.get("purchasedItems") as? MutableList<String>
-                                ?: mutableListOf()
-
+                            snapshot.get("purchasedItems") as? MutableList<String> ?: mutableListOf()
                         val categories =
-                            snapshot.get("categories") as? MutableMap<String, Long>
-                                ?: mutableMapOf()
+                            snapshot.get("categories") as? MutableMap<String, Long> ?: mutableMapOf()
 
                         if (currentPoints < item.price) {
                             throw Exception("No tienes suficientes puntos")
                         }
 
-                        // ================= ACTUALIZACIONES =================
                         val newPoints = currentPoints - item.price
                         transaction.update(userRef, "points", newPoints)
 
                         purchasedItems.add(item.name)
                         transaction.update(userRef, "purchasedItems", purchasedItems)
 
-                        // ---- Categorías (contador) ----
-                        val currentCount = categories[item.category] ?: 0
-                        categories[item.category] = currentCount + 1
+                        categories[item.category] = (categories[item.category] ?: 0) + 1
                         transaction.update(userRef, "categories", categories)
 
-                        // ---- Código ----
                         val code = generateCouponCode()
                         codesMap[item.name] = code
                         transaction.update(userRef, "codes", codesMap)
@@ -110,33 +95,23 @@ class StoreAdapter(
                         .addOnSuccessListener { newPoints ->
                             notifyItemChanged(position)
                             onPointsUpdated(newPoints)
-
-                            val code = codesMap[item.name] ?: "No disponible"
-                            android.app.AlertDialog.Builder(context)
-                                .setTitle("Compra realizada")
-                                .setMessage(
-                                    "Has comprado '${item.name}'\n\n"  +
-                                            "Tu código: $code"
-                                )
-                                .setPositiveButton("Aceptar") { d, _ -> d.dismiss() }
-                                .show()
                         }
                         .addOnFailureListener { e ->
-                            Toast.makeText(
-                                context,
-                                e.message ?: "Error al comprar",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                            Toast.makeText(context, e.message, Toast.LENGTH_SHORT).show()
                         }
-
-                    dialog.dismiss()
                 }
-                .setNegativeButton("No") { d, _ -> d.dismiss() }
+                .setNegativeButton("No", null)
                 .show()
         }
     }
 
-    // ================= CÓDIGO CUPÓN =================
+    /** Permite a la Activity cambiar la lista (orden / filtro) */
+    fun updateItems(newItems: List<StoreItem>) {
+        items.clear()
+        items.addAll(newItems)
+        notifyDataSetChanged()
+    }
+
     private fun generateCouponCode(): String {
         val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
         return (1..4).joinToString("-") {
