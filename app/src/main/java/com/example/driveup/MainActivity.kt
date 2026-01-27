@@ -559,6 +559,7 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun drawRoute(json: String) {
+
         if (!mapReady) return
 
         val route = JSONObject(json)
@@ -576,53 +577,96 @@ class MainActivity : AppCompatActivity() {
         tvEta.text = formatTime(distanceKm, durationMin)
         navigationBar.visibility = View.VISIBLE
 
-        // ================= GEOMETRÍA RUTA =================
+        // ================= GEOMETRÍA =================
 
-        val coords = route.getJSONObject("geometry").getJSONArray("coordinates")
+        val coords = route
+            .getJSONObject("geometry")
+            .getJSONArray("coordinates")
+
         val points = mutableListOf<Point>()
         val latLngs = mutableListOf<LatLng>()
 
         for (i in 0 until coords.length()) {
+
             val c = coords.getJSONArray(i)
-            points.add(Point.fromLngLat(c.getDouble(0), c.getDouble(1)))
-            latLngs.add(LatLng(c.getDouble(1), c.getDouble(0)))
+
+            points.add(
+                Point.fromLngLat(
+                    c.getDouble(0),
+                    c.getDouble(1)
+                )
+            )
+
+            latLngs.add(
+                LatLng(
+                    c.getDouble(1),
+                    c.getDouble(0)
+                )
+            )
         }
 
         routePoints = latLngs
 
         map.getStyle { style ->
+
             if (style.getSource("route") == null) {
+
                 style.addSource(
-                    GeoJsonSource("route", LineString.fromLngLats(points))
-                )
-                style.addLayer(
-                    LineLayer("route-layer", "route").withProperties(
-                        lineColor("#2196F3"),
-                        lineWidth(6f)
+                    GeoJsonSource(
+                        "route",
+                        LineString.fromLngLats(points)
                     )
                 )
+
+                style.addLayer(
+                    LineLayer("route-layer", "route")
+                        .withProperties(
+                            lineColor("#2196F3"),
+                            lineWidth(6f)
+                        )
+                )
+
             } else {
+
                 (style.getSource("route") as GeoJsonSource)
-                    .setGeoJson(LineString.fromLngLats(points))
+                    .setGeoJson(
+                        LineString.fromLngLats(points)
+                    )
             }
         }
 
-        // ================= SI ES PREVIEW, TERMINAMOS AQUÍ =================
+        // ================= PREVIEW =================
         if (previewing) {
+
             tvInstruction.text = "Vista previa de la ruta"
             tvStepDistance.text = ""
+
             return
         }
 
-        // ================= NAVEGACIÓN REAL (COMO ANTES) =================
+        // ================= TRIP STATS =================
 
-        tripStatsManager.startTrip(
-            optimalDistanceMeters = distanceMeters,
-            optimalDurationSeconds = durationSeconds
-        )
+        if (!isRecalculating) {
+            // 👉 PRIMERA RUTA
+            tripStatsManager.startTrip(
+                optimalDistanceMeters = distanceMeters,
+                optimalDurationSeconds = durationSeconds
+            )
+        } else {
+            // 👉 RECÁLCULO
+            tripStatsManager.startNewSegment(
+                optimalDistanceMeters = distanceMeters,
+                optimalDurationSeconds = durationSeconds
+            )
+        }
+
+        isRecalculating = false
+
+        // ================= ESTADO =================
 
         onNavigationStarted()
         arrived = false
+        navigating = true
 
         // ================= INSTRUCCIONES =================
 
@@ -632,18 +676,26 @@ class MainActivity : AppCompatActivity() {
         val steps = mutableListOf<NavigationStep>()
 
         for (i in 0 until stepsJson.length()) {
+
             val step = stepsJson.getJSONObject(i)
 
             val maneuver = step.getJSONObject("maneuver")
+
             val type = maneuver.getString("type")
             val modifier = maneuver.optString("modifier", "")
             val name = step.optString("name", "")
+
             val distance = step.getDouble("distance")
 
             val loc = maneuver.getJSONArray("location")
-            val latLng = LatLng(loc.getDouble(1), loc.getDouble(0))
 
-            val instruction = buildInstruction(type, modifier, name)
+            val latLng = LatLng(
+                loc.getDouble(1),
+                loc.getDouble(0)
+            )
+
+            val instruction =
+                buildInstruction(type, modifier, name)
 
             steps.add(
                 NavigationStep(
@@ -657,21 +709,23 @@ class MainActivity : AppCompatActivity() {
         navigationSteps = steps
         currentStepIndex = 0
 
-        if (isRecalculating && currentLocation != null) {
-            alignStepWithCurrentLocation(currentLocation!!)
-            isRecalculating = false
-        }
-
         if (navigationSteps.isNotEmpty()) {
-            tvInstruction.text = navigationSteps[0].instruction
-            updateTurnIcon(navigationSteps[0].instruction)
+
+            tvInstruction.text =
+                navigationSteps[0].instruction
+
+            updateTurnIcon(
+                navigationSteps[0].instruction
+            )
         }
     }
+
 
 
     // ================= RECÁLCULO =================
 
     private fun checkRouteDeviation(loc: Location) {
+
         if (!navigating) return
         if (routePoints.isEmpty()) return
         if (destinationLatLng == null) return
@@ -679,38 +733,53 @@ class MainActivity : AppCompatActivity() {
         var minDistance = Float.MAX_VALUE
 
         for (p in routePoints) {
+
             val tmp = Location("").apply {
                 latitude = p.latitude
                 longitude = p.longitude
             }
+
             val d = loc.distanceTo(tmp)
-            if (d < minDistance) minDistance = d
+
+            if (d < minDistance) {
+                minDistance = d
+            }
         }
 
-        if (minDistance > 50 && System.currentTimeMillis() - lastRecalcTime > 8000) {
+        // ================= DESVÍO DETECTADO =================
+        if (minDistance > 50 &&
+            System.currentTimeMillis() - lastRecalcTime > 8000
+        ) {
+
             lastRecalcTime = System.currentTimeMillis()
             isRecalculating = true
+
+            // 👉 CERRAMOS EL SEGMENTO ACTUAL (IMPORTANTE)
+            tripStatsManager.closeCurrentSegment()
 
             val current = LatLng(loc.latitude, loc.longitude)
             val dest = destinationLatLng ?: return
 
             lifecycleScope.launch(Dispatchers.IO) {
 
-                // Limpiar completamente estado anterior
                 runOnUiThread {
+
                     clearRoute()
+
                     navigationSteps = emptyList()
                     currentStepIndex = 0
                     arrived = false
-                    navigating = false
+
                     tvInstruction.text = "Recalculando ruta…"
+                    tvStepDistance.text = ""
                 }
 
-                // Pedir una ruta NUEVA desde tu posición real
+                // Nueva ruta desde posición real
                 fetchRoute(current, dest)
             }
         }
     }
+
 
     private fun updateDynamicEta(loc: Location) {
         if (destinationLatLng == null) return
@@ -1148,8 +1217,16 @@ private fun saveTripResult(tripResult: TripResult) {
         val optimalHours = tripResult.optimalDurationSeconds / 3600.0
 
         // ================= VELOCIDADES =================
-        val realSpeed = realKm / realHours
-        val optimalSpeed = realKm / optimalHours
+        val realSpeed =
+            if (realHours > 0)
+                realKm / realHours
+            else 0.0
+
+        val optimalSpeed =
+            if (optimalHours > 0)
+                (tripResult.optimalDistanceMeters / 1000.0) / optimalHours
+            else 0.0
+
 
         // ================= EFICIENCIA (%) =================
         // ratio viene ya calculado en TripResult

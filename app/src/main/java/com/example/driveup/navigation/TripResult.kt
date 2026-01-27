@@ -7,10 +7,4 @@ data class TripResult(
     val realDurationSeconds: Double,
     val ratio: Double,
     val pointsEarned: Int
-) {
-    companion object {
-        val EMPTY = TripResult(
-            0.0, 0.0, 0.0, 0.0, 0.0, 0
-        )
-    }
-}
+)

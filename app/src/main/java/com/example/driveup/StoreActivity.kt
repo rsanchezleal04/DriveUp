@@ -32,7 +32,7 @@ class StoreActivity : AppCompatActivity() {
     // ===== CATEGORÍAS FILTRO =====
     private val filterCategories = listOf(
         "Todas",
-        "Ropa", "Supermercados", "Gasolina", "Viajes", "Tcnología",
+        "Ropa", "Supermercados", "Gasolina", "Viajes", "Tecnología",
         "Maquillaje y cosmeticos", "Ocio", "Coches", "Gimnasio",
         "Ornamento", "Restaurante", "Libros", "Amazón", "Farmacia",
         "Talleres", "Cerveza", "HigienePersonal",
