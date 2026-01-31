@@ -4,7 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-import com.example.driveup.Models.User
+//import com.example.driveup.Models.User
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
@@ -35,6 +35,7 @@ class RegisterActivity : AppCompatActivity() {
         )
 
         btnRegister.setOnClickListener {
+
             val email = etEmail.text.toString().trim()
             val password = etPassword.text.toString().trim()
             val confirmPassword = etConfirmPassword.text.toString().trim()
@@ -76,21 +77,7 @@ class RegisterActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            db.collection("users")
-                .whereEqualTo("phone", phone)
-                .limit(1)
-                .get()
-                .addOnSuccessListener { snap ->
-                    if (!snap.isEmpty) {
-                        toast("Este teléfono ya está registrado")
-                        return@addOnSuccessListener
-                    }
-
-                    createAccount(email, password, username, phone, age, gender)
-                }
-                .addOnFailureListener {
-                    toast("Error comprobando teléfono")
-                }
+            createAccount(email, password, username, phone, age, gender)
         }
     }
 
@@ -106,27 +93,49 @@ class RegisterActivity : AppCompatActivity() {
             .addOnSuccessListener { result ->
 
                 val firebaseUser = result.user ?: return@addOnSuccessListener
+                val uid = firebaseUser.uid
 
-                firebaseUser.sendEmailVerification()
+                val phoneRef = db.collection("phone_index").document(phone)
+                val userRef = db.collection("users").document(uid)
 
-                val user = User(
-                    uid = firebaseUser.uid,
-                    email = email,
-                    username = username,
-                    phone = phone,
-                    age = age,
-                    gender = gender,
-                    points = 0,
-                    totalKm = 0.0
-                )
+                db.runTransaction { tx ->
 
-                db.collection("users")
-                    .document(firebaseUser.uid)
-                    .set(user)
+                    val phoneSnap = tx.get(phoneRef)
+                    if (phoneSnap.exists()) {
+                        throw Exception("TEL_DUPLICADO")
+                    }
+
+                    tx.set(phoneRef, mapOf("uid" to uid))
+
+                    val user = hashMapOf(
+                        "uid" to uid,
+                        "email" to email,
+                        "username" to username,
+                        "phone" to phone,
+                        "age" to age,
+                        "gender" to gender,
+                        "points" to 0,
+                        "totalKm" to 0.0,
+                        "categories" to emptyMap<String, Long>(),
+                        "codes" to emptyMap<String, String>(),
+                        "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+                    )
+
+                    tx.set(userRef, user)
+                }
                     .addOnSuccessListener {
-                        toast("Cuenta creada. Revisa tu email para verificarla")
+                        firebaseUser.sendEmailVerification()
+                        toast("Cuenta creada. Revisa tu email")
                         startActivity(Intent(this, VerifyEmailActivity::class.java))
                         finish()
+                    }
+                    .addOnFailureListener { e ->
+                        firebaseUser.delete()
+                        if (e.message == "TEL_DUPLICADO") {
+                            toast("Este teléfono ya está registrado")
+                        } else {
+                            toast(e.message ?: "Error creando usuario")
+                        }
                     }
             }
             .addOnFailureListener {
