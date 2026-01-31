@@ -49,6 +49,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import android.view.inputmethod.InputMethodManager
+import com.example.driveup.navigation.OsmSpeedLimitProvider
+import com.example.driveup.navigation.SpeedLimitManager
+import com.google.firebase.firestore.FieldValue
+
+
 
 data class NavigationStep(
     val instruction: String,
@@ -78,57 +83,35 @@ class MainActivity : AppCompatActivity() {
     private val client = OkHttpClient()
     private lateinit var fusedLocation: FusedLocationProviderClient
     private var locationCallback: LocationCallback? = null
-
     private var currentLocation: Location? = null
     private var routePoints: List<LatLng> = emptyList()
     private var destinationLatLng: LatLng? = null
     private var navigating = false
-
     private var previewing = false
-
     private var firstZoomDone = false
     private var mapReady = false
-
     private var lastRecalcTime = 0L
-
     private var lastEtaUpdate = 0L
-
     private val ARRIVAL_DISTANCE_METERS = 25f
-
     private var arrived = false
-
     private lateinit var etOrigin: AutoCompleteTextView
-
     private var followUser = true
-
     private var navigationSteps: List<NavigationStep> = emptyList()
-
     private var currentStepIndex = 0
-
     private lateinit var tts: TextToSpeech
-
     private lateinit var tvStepDistance: TextView
-
     private var isRecalculating = false
-
     private lateinit var ivTurnIcon: ImageView
-
     private lateinit var btnMute: ImageButton
-
     private var voiceEnabled = true
-
     private val speedManager = SpeedManager()
-
+    private val speedLimitManager =
+        SpeedLimitManager(OsmSpeedLimitProvider())
     private lateinit var tvSpeed: TextView
-
     private val tripStatsManager = TripStatsManager()
-
     private val auth = FirebaseAuth.getInstance()
-
     private val db = FirebaseFirestore.getInstance()
-
     private lateinit var btnStore: ImageButton
-
 
 
     private val permissionLauncher =
@@ -280,14 +263,17 @@ class MainActivity : AppCompatActivity() {
 
     private fun startLocationUpdates() {
 
-        if (ContextCompat.checkSelfPermission(
+        if (
+            ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.ACCESS_FINE_LOCATION
             ) != PackageManager.PERMISSION_GRANTED
         ) return
 
+
         val request = LocationRequest.Builder(
-            Priority.PRIORITY_HIGH_ACCURACY, 500
+            Priority.PRIORITY_HIGH_ACCURACY,
+            500
         )
             .setMinUpdateIntervalMillis(300)
             .setMinUpdateDistanceMeters(0f)
@@ -295,12 +281,20 @@ class MainActivity : AppCompatActivity() {
 
 
         locationCallback = object : LocationCallback() {
+
             override fun onLocationResult(result: LocationResult) {
+
                 val loc = result.lastLocation ?: return
+
+
+                // ================= POSICIÓN =================
 
                 currentLocation = loc
                 updateCameraFollowingCar(loc)
-                tripStatsManager.onLocationUpdate(loc)
+                zoomToLocationOnce(loc)
+
+
+                // ================= VELOCIDAD =================
 
                 val speed = if (loc.hasSpeed()) {
                     speedManager.update(loc)
@@ -308,15 +302,38 @@ class MainActivity : AppCompatActivity() {
                     speedManager.getCurrentSpeed()
                 }
 
-                tvSpeed.text = "$speed"
+                tvSpeed.text = speed.toString()
 
 
-                zoomToLocationOnce(loc)
+                // ================= SPEED LIMIT =================
+
+                // Actualiza en background (OSM / API)
+                speedLimitManager.update(
+                    lifecycleScope,
+                    loc
+                )
+
+                val speedLimit =
+                    speedLimitManager.getCurrentLimit()
+
+
+                // ================= STATS =================
+
+                tripStatsManager.onLocationUpdate(
+                    loc,
+                    speed,
+                    speedLimit
+                )
+
+
+                // ================= NAVEGACIÓN =================
 
                 if (navigating) {
+
                     checkRouteDeviation(loc)
                     updateDynamicEta(loc)
                     checkArrival(loc)
+
                     updateCurrentInstruction(loc)
                     updateNavigationInstruction(loc)
                     updateStepDistance(loc)
@@ -324,12 +341,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+
         fusedLocation.requestLocationUpdates(
             request,
             locationCallback!!,
             mainLooper
         )
     }
+
 
     // ================= ZOOM INICIAL =================
 
@@ -566,6 +585,7 @@ class MainActivity : AppCompatActivity() {
             .getJSONArray("routes")
             .getJSONObject(0)
 
+
         // ================= DISTANCIA / ETA =================
 
         val distanceMeters = route.getDouble("distance")
@@ -576,6 +596,7 @@ class MainActivity : AppCompatActivity() {
 
         tvEta.text = formatTime(distanceKm, durationMin)
         navigationBar.visibility = View.VISIBLE
+
 
         // ================= GEOMETRÍA =================
 
@@ -607,6 +628,9 @@ class MainActivity : AppCompatActivity() {
 
         routePoints = latLngs
 
+
+        // ================= DIBUJAR RUTA =================
+
         map.getStyle { style ->
 
             if (style.getSource("route") == null) {
@@ -635,7 +659,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+
         // ================= PREVIEW =================
+
         if (previewing) {
 
             tvInstruction.text = "Vista previa de la ruta"
@@ -644,29 +670,24 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+
         // ================= TRIP STATS =================
+        // Solo iniciamos viaje la primera vez
 
         if (!isRecalculating) {
-            // 👉 PRIMERA RUTA
-            tripStatsManager.startTrip(
-                optimalDistanceMeters = distanceMeters,
-                optimalDurationSeconds = durationSeconds
-            )
-        } else {
-            // 👉 RECÁLCULO
-            tripStatsManager.startNewSegment(
-                optimalDistanceMeters = distanceMeters,
-                optimalDurationSeconds = durationSeconds
-            )
+            tripStatsManager.startTrip()
         }
 
         isRecalculating = false
 
+
         // ================= ESTADO =================
 
         onNavigationStarted()
+
         arrived = false
         navigating = true
+
 
         // ================= INSTRUCCIONES =================
 
@@ -709,16 +730,17 @@ class MainActivity : AppCompatActivity() {
         navigationSteps = steps
         currentStepIndex = 0
 
+
         if (navigationSteps.isNotEmpty()) {
 
-            tvInstruction.text =
-                navigationSteps[0].instruction
+            val first = navigationSteps[0]
 
-            updateTurnIcon(
-                navigationSteps[0].instruction
-            )
+            tvInstruction.text = first.instruction
+
+            updateTurnIcon(first.instruction)
         }
     }
+
 
 
 
@@ -730,7 +752,9 @@ class MainActivity : AppCompatActivity() {
         if (routePoints.isEmpty()) return
         if (destinationLatLng == null) return
 
+
         var minDistance = Float.MAX_VALUE
+
 
         for (p in routePoints) {
 
@@ -746,19 +770,27 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // ================= DESVÍO DETECTADO =================
-        if (minDistance > 50 &&
-            System.currentTimeMillis() - lastRecalcTime > 8000
+
+        // ================= DESVÍO =================
+
+        val now = System.currentTimeMillis()
+
+        if (
+            minDistance > 50 &&
+            now - lastRecalcTime > 8000
         ) {
 
-            lastRecalcTime = System.currentTimeMillis()
+            lastRecalcTime = now
             isRecalculating = true
 
-            // 👉 CERRAMOS EL SEGMENTO ACTUAL (IMPORTANTE)
-            tripStatsManager.closeCurrentSegment()
 
-            val current = LatLng(loc.latitude, loc.longitude)
+            val current = LatLng(
+                loc.latitude,
+                loc.longitude
+            )
+
             val dest = destinationLatLng ?: return
+
 
             lifecycleScope.launch(Dispatchers.IO) {
 
@@ -774,11 +806,12 @@ class MainActivity : AppCompatActivity() {
                     tvStepDistance.text = ""
                 }
 
-                // Nueva ruta desde posición real
+
                 fetchRoute(current, dest)
             }
         }
     }
+
 
 
     private fun updateDynamicEta(loc: Location) {
@@ -1184,16 +1217,16 @@ private fun saveTripResult(tripResult: TripResult) {
 
         val snapshot = transaction.get(userRef)
 
-        val currentPoints = snapshot.getLong("points")?.toInt() ?: 0
         val currentKm = snapshot.getDouble("totalKm") ?: 0.0
 
-        val newPoints = currentPoints + tripResult.pointsEarned
         val newKm = currentKm + (tripResult.realDistanceMeters / 1000.0)
 
         transaction.update(
             userRef,
             mapOf(
-                "points" to newPoints,
+                "points" to FieldValue.increment(
+                    tripResult.pointsEarned.toLong()
+                ),
                 "totalKm" to newKm
             )
         )
@@ -1201,65 +1234,83 @@ private fun saveTripResult(tripResult: TripResult) {
         .addOnSuccessListener {
             toast("+${tripResult.pointsEarned} puntos")
         }
-        .addOnFailureListener {
+        .addOnFailureListener { e ->
+            e.printStackTrace()
             toast("Error guardando puntos")
         }
 }
 
 
+
     private fun showTripSummary(tripResult: TripResult) {
 
-        val view = layoutInflater.inflate(R.layout.dialog_trip_summary, null)
+        val view =
+            layoutInflater.inflate(
+                R.layout.dialog_trip_summary,
+                null
+            )
+
 
         // ================= CONVERSIONES =================
-        val realKm = tripResult.realDistanceMeters / 1000.0
-        val realHours = tripResult.realDurationSeconds / 3600.0
-        val optimalHours = tripResult.optimalDurationSeconds / 3600.0
 
-        // ================= VELOCIDADES =================
+        val realKm =
+            tripResult.realDistanceMeters / 1000.0
+
+        val realHours =
+            tripResult.realDurationSeconds / 3600.0
+
+
+        // ================= VELOCIDAD MEDIA =================
+
         val realSpeed =
             if (realHours > 0)
                 realKm / realHours
             else 0.0
 
-        val optimalSpeed =
-            if (optimalHours > 0)
-                (tripResult.optimalDistanceMeters / 1000.0) / optimalHours
-            else 0.0
 
+        // ================= RATIOS =================
 
-        // ================= EFICIENCIA (%) =================
-        // ratio viene ya calculado en TripResult
-        val efficiencyPercent = (tripResult.ratio * 100).toInt()
+        val greenPercent =
+            (tripResult.greenRatio * 100).toInt()
+
+        val penaltyPercent =
+            (tripResult.penalty * 100).toInt()
+
 
         // ================= TEXTO =================
+
         view.findViewById<TextView>(R.id.tvDistance).text =
             "Distancia: %.2f km".format(realKm)
 
-        view.findViewById<TextView>(R.id.tvOptimalSpeed).text =
-            "Velocidad óptima: %.1f km/h".format(optimalSpeed)
-
         view.findViewById<TextView>(R.id.tvRealSpeed).text =
-            "Tu velocidad media: %.1f km/h".format(realSpeed)
+            "Velocidad media: %.1f km/h".format(realSpeed)
 
         view.findViewById<TextView>(R.id.tvEfficiency).text =
-            "Eficiencia del viaje: $efficiencyPercent%"
+            "Conducción responsable: $greenPercent%"
+
+        view.findViewById<TextView>(R.id.tvPenalty).text =
+            "Penalización: -$penaltyPercent%"
 
         view.findViewById<TextView>(R.id.tvPoints).text =
             "Puntos ganados: ${tripResult.pointsEarned}"
 
+
         // ================= DIÁLOGO =================
+
         val dialog = AlertDialog.Builder(this)
             .setView(view)
             .setCancelable(false)
             .create()
 
-        view.findViewById<Button>(R.id.btnContinue).setOnClickListener {
-            dialog.dismiss()
-        }
+
+        view.findViewById<Button>(R.id.btnContinue)
+            .setOnClickListener {
+                dialog.dismiss()
+            }
 
         dialog.show()
     }
+
 
 
 

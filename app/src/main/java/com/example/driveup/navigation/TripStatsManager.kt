@@ -2,240 +2,257 @@ package com.example.driveup.navigation
 
 import android.location.Location
 import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.roundToInt
 
 class TripStatsManager {
 
-    // ================= TOTAL ACUMULADO =================
-    private var totalPoints = 0
-    private var totalDistanceMeters = 0.0
-    private var totalTimeSeconds = 0.0
-    private var totalOptimalDistanceMeters = 0.0
-    private var totalOptimalDurationSeconds = 0.0
-
-    // ================= RATIO PONDERADO =================
-    private var totalWeightedRatio = 0.0
-    private var totalWeightedDistance = 0.0
-
-    // ================= SEGMENTO ACTUAL =================
-    private var optimalDistanceMeters = 0.0
-    private var optimalDurationSeconds = 0.0
-
-    private var segmentStartTime = 0L
-    private var segmentDistanceMeters = 0.0
-    private var lastLocation: Location? = null
-
-    private var segmentActive = false
-
     // ================= CONFIG =================
-    private val POINTS_PER_KM = 10
+
+    private val POINTS_PER_KM = 10.0
     private val MIN_VALID_DISTANCE = 100.0 // metros
+
+    private val YELLOW_PENALTY = 0.15
+    private val RED_PENALTY = 0.45
+    private val EXTREME_PENALTY = 0.90
+
+
+    // ================= TOTALES =================
+
+    private var totalDistanceMeters = 0.0
+    private var totalDrivingSeconds = 0.0
+
+
+    // ================= TIEMPOS POR ZONA =================
+
+    private var greenSeconds = 0.0
+    private var yellowSeconds = 0.0
+    private var redSeconds = 0.0
+    private var extremeSeconds = 0.0
+
+
+    // ================= TRACKING =================
+
+    private var lastLocation: Location? = null
+    private var lastUpdateTime = 0L
+
+    private var tripActive = false
 
 
     // ===================================================
     // INICIAR VIAJE
     // ===================================================
-    fun startTrip(
-        optimalDistanceMeters: Double,
-        optimalDurationSeconds: Double
-    ) {
+
+    fun startTrip() {
+
         resetAll()
-        startNewSegment(optimalDistanceMeters, optimalDurationSeconds)
+        tripActive = true
     }
 
 
     // ===================================================
-    // NUEVO SEGMENTO
+    // UPDATE PRINCIPAL
     // ===================================================
-    fun startNewSegment(
-        optimalDistanceMeters: Double,
-        optimalDurationSeconds: Double
+
+    fun onLocationUpdate(
+        location: Location,
+        speedKmh: Int,
+        speedLimit: Int
     ) {
 
-        this.optimalDistanceMeters = optimalDistanceMeters
+        if (!tripActive) return
 
-        // Duración mínima coherente
-        this.optimalDurationSeconds =
-            if (optimalDurationSeconds > 5)
-                optimalDurationSeconds
-            else
-                (optimalDistanceMeters / 1000.0) * 60
+        val now = System.currentTimeMillis()
 
 
-        totalOptimalDistanceMeters += optimalDistanceMeters
+        // Primera lectura
+        if (lastUpdateTime == 0L) {
 
-        // ⚠️ IMPORTANTE: sumamos la corregida
-        totalOptimalDurationSeconds += this.optimalDurationSeconds
-
-
-        segmentDistanceMeters = 0.0
-        lastLocation = null
-        segmentStartTime = System.currentTimeMillis()
-        segmentActive = true
-    }
+            lastUpdateTime = now
+            lastLocation = location
+            return
+        }
 
 
-    // ===================================================
-    // ACTUALIZAR POSICIÓN
-    // ===================================================
-    fun onLocationUpdate(location: Location) {
+        val dt = (now - lastUpdateTime) / 1000.0
+        lastUpdateTime = now
 
-        if (!segmentActive) return
+        if (dt <= 0) return
+
+
+        // ================= IGNORAR SI CASI PARADO =================
+
+        if (speedKmh < 3) {
+
+            lastLocation = location
+            lastUpdateTime = now
+            return
+        }
+
+
+        // ================= DISTANCIA =================
 
         lastLocation?.let { last ->
 
             val delta = last.distanceTo(location)
 
-            // Filtro GPS
             if (delta in 0.5..150.0) {
-                segmentDistanceMeters += delta
                 totalDistanceMeters += delta
             }
         }
 
         lastLocation = location
-    }
 
 
-    // ===================================================
-    // CERRAR SEGMENTO
-    // ===================================================
-    fun closeCurrentSegment(): Int {
+        // ================= TIEMPO =================
 
-        if (!segmentActive) return 0
+        totalDrivingSeconds += dt
 
 
-        val realTimeSeconds =
-            max(1.0, (System.currentTimeMillis() - segmentStartTime) / 1000.0)
+        // ================= ZONAS =================
+
+        val excess = speedKmh - speedLimit
 
 
-        // Segmento inválido (ruido / cancelación)
-        if (segmentDistanceMeters < MIN_VALID_DISTANCE) {
-            segmentActive = false
-            return 0
+        when {
+
+            excess <= 5 -> {
+                greenSeconds += dt
+            }
+
+            excess in 6..13 -> {
+                yellowSeconds += dt
+            }
+
+            excess in 14..20 -> {
+                redSeconds += dt
+            }
+
+            else -> {
+                extremeSeconds += dt
+            }
         }
-
-
-        val realKm = segmentDistanceMeters / 1000.0
-        val realHours = realTimeSeconds / 3600.0
-        val optimalHours = optimalDurationSeconds / 3600.0
-        val optimalKm = optimalDistanceMeters / 1000.0
-
-
-        // ================= VELOCIDADES =================
-
-        val idealSpeed =
-            if (optimalHours > 0)
-                optimalKm / optimalHours
-            else 0.0
-
-
-        val idealSpeedWithMargin = idealSpeed + 5.0
-
-
-        val realSpeed =
-            if (realHours > 0)
-                realKm / realHours
-            else 0.0
-
-
-        val ratio =
-            if (idealSpeedWithMargin > 0)
-                realSpeed / idealSpeedWithMargin
-            else 1.0
-
-
-        val cappedRatio = min(ratio, 1.0)
-
-
-        // ================= RATIO PONDERADO =================
-
-        totalWeightedRatio += cappedRatio * realKm
-        totalWeightedDistance += realKm
-
-
-        // ================= MULTIPLICADOR =================
-
-        val multiplier = when {
-            ratio < 0.5 -> 0.0
-            ratio <= 1.0 -> 1.0
-            ratio <= 1.10 -> 0.75
-            ratio <= 1.20 -> 0.5
-            else -> 0.0
-        }
-
-
-        // ================= PUNTOS =================
-
-        val basePoints = realKm * POINTS_PER_KM
-        val segmentPoints = (basePoints * multiplier).roundToInt()
-
-
-        // ================= ACUMULAR =================
-
-        totalPoints += segmentPoints
-        totalTimeSeconds += realTimeSeconds
-
-
-        segmentActive = false
-
-        return segmentPoints
     }
 
 
     // ===================================================
     // FINALIZAR VIAJE
     // ===================================================
+
     fun finishTrip(): TripResult {
 
-        closeCurrentSegment()
+        tripActive = false
 
 
-        // 🚨 VIAJE DEMASIADO CORTO → INVALIDO
+        // Viaje inválido
         if (totalDistanceMeters < MIN_VALID_DISTANCE) {
 
+            return TripResult.empty()
+        }
+
+
+        val totalKm = totalDistanceMeters / 1000.0
+
+
+        // ================= RATIOS =================
+
+        val totalTime =
+            max(1.0, totalDrivingSeconds)
+
+
+        val greenRatio = greenSeconds / totalTime
+        val yellowRatio = yellowSeconds / totalTime
+        val redRatio = redSeconds / totalTime
+        val extremeRatio = extremeSeconds / totalTime
+
+
+        // ================= BASE =================
+
+        var points = totalKm * POINTS_PER_KM
+
+
+        // ================= CASTIGO EXTREMO =================
+
+        if (extremeRatio > 0.40) {
+
             return TripResult(
-                optimalDistanceMeters = 0.0,
-                realDistanceMeters = 0.0,
-                optimalDurationSeconds = 0.0,
-                realDurationSeconds = 0.0,
-                ratio = 0.0,
-                pointsEarned = 0
+                totalDistanceMeters,
+                totalDrivingSeconds,
+                greenRatio,
+                yellowRatio,
+                redRatio,
+                extremeRatio,
+                1.0,
+                0
             )
         }
 
 
-        val avgRatio =
-            if (totalWeightedDistance > 0)
-                totalWeightedRatio / totalWeightedDistance
-            else 0.0
+        // ================= PENALTY =================
+
+        val penaltyRaw =
+            yellowRatio * YELLOW_PENALTY +
+                    redRatio * RED_PENALTY +
+                    extremeRatio * EXTREME_PENALTY
+
+
+        val penalty =
+            penaltyRaw.coerceIn(0.0, 0.95)
+
+
+        points *= (1.0 - penalty)
+
+
+        // ================= BONUS =================
+
+        when {
+
+            greenRatio >= 1.0 -> {
+                points *= 1.5
+            }
+
+            greenRatio >= 0.9 -> {
+                points *= 1.25
+            }
+        }
+
+
+        // ================= CLAMP =================
+
+        points = max(0.0, points)
 
 
         return TripResult(
-            optimalDistanceMeters = totalOptimalDistanceMeters,
             realDistanceMeters = totalDistanceMeters,
-            optimalDurationSeconds = totalOptimalDurationSeconds,
-            realDurationSeconds = totalTimeSeconds,
-            ratio = avgRatio,
-            pointsEarned = totalPoints
+            realDurationSeconds = totalDrivingSeconds,
+
+            greenRatio = greenRatio,
+            yellowRatio = yellowRatio,
+            redRatio = redRatio,
+            extremeRatio = extremeRatio,
+
+            penalty = penalty,
+            pointsEarned = points.roundToInt()
         )
     }
 
 
-    // ====================== RESET ======================
+    // ===================================================
+    // RESET
+    // ===================================================
+
     private fun resetAll() {
 
-        totalPoints = 0
         totalDistanceMeters = 0.0
-        totalTimeSeconds = 0.0
-        totalOptimalDistanceMeters = 0.0
-        totalOptimalDurationSeconds = 0.0
+        totalDrivingSeconds = 0.0
 
-        totalWeightedRatio = 0.0
-        totalWeightedDistance = 0.0
+        greenSeconds = 0.0
+        yellowSeconds = 0.0
+        redSeconds = 0.0
+        extremeSeconds = 0.0
 
-        segmentActive = false
         lastLocation = null
+        lastUpdateTime = 0L
+
+        tripActive = false
     }
 }

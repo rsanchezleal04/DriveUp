@@ -5,6 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
 
+
     <TextView
         android:text="Resumen del viaje"
         android:textSize="20sp"
@@ -13,28 +14,37 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content" />
 
+
     <TextView
         android:id="@+id/tvDistance"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content" />
 
-    <TextView
-        android:id="@+id/tvOptimalSpeed"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
 
     <TextView
         android:id="@+id/tvRealSpeed"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content" />
 
-    <!-- 🔥 NUEVO -->
+
+    <!-- % Conducción verde -->
     <TextView
         android:id="@+id/tvEfficiency"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
         android:textStyle="bold" />
+
+
+    <!-- 🔴 Penalización -->
+    <TextView
+        android:id="@+id/tvPenalty"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textColor="#C62828"
+        android:textStyle="bold" />
+
 
     <TextView
         android:id="@+id/tvPoints"
@@ -43,6 +53,7 @@
         android:layout_marginTop="12dp"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content" />
+
 
     <Button
         android:id="@+id/btnContinue"
