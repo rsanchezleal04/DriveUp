@@ -22,10 +22,11 @@
         android:layout_height="48dp"
         android:layout_marginStart="16dp"
         android:layout_marginTop="16dp"
-        android:background="@android:color/transparent"
-        android:src="@android:drawable/ic_menu_manage"
-        android:contentDescription="Ajustes"
-        app:tint="@color/driveup_orange"
+        android:background="@drawable/bg_circle_white"
+        android:src="@drawable/ic_menu"
+        android:padding="10dp"
+        android:scaleType="centerInside"
+        android:contentDescription="Menú"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/topContainer"/>
 
