@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<resources>
+
+    <!-- Divider para resumen de viaje -->
+    <style name="Divider">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">1dp</item>
+        <item name="android:background">#DDDDDD</item>
+        <item name="android:layout_marginVertical">10dp</item>
+    </style>
+
+</resources>

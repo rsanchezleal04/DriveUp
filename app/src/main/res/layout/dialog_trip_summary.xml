@@ -1,67 +1,170 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
-    android:padding="20dp"
+
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/overlaySummary"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content">
+    android:layout_height="match_parent"
+    android:background="#80000000"
+    android:clickable="true"
+    android:focusable="true">
 
-
-    <TextView
-        android:text="Resumen del viaje"
-        android:textSize="20sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="12dp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
-
-
-    <TextView
-        android:id="@+id/tvDistance"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
-
-
-    <TextView
-        android:id="@+id/tvRealSpeed"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
-
-
-    <!-- % Conducción verde -->
-    <TextView
-        android:id="@+id/tvEfficiency"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:textStyle="bold" />
-
-
-    <!-- 🔴 Penalización -->
-    <TextView
-        android:id="@+id/tvPenalty"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:textColor="#C62828"
-        android:textStyle="bold" />
-
-
-    <TextView
-        android:id="@+id/tvPoints"
-        android:textStyle="bold"
-        android:textSize="18sp"
-        android:layout_marginTop="12dp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
-
-
-    <Button
-        android:id="@+id/btnContinue"
+    <!-- CONTENEDOR CENTRADO -->
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Continuar"
-        android:layout_marginTop="16dp"
-        android:backgroundTint="@color/driveup_orange"
-        android:textColor="@android:color/white" />
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:padding="16dp">
 
-</LinearLayout>
+        <!-- TARJETA -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxWidth="360dp"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:background="@drawable/bg_trip_summary_card"
+            android:elevation="8dp">
+
+            <!-- TITULO -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="RESUMEN DEL VIAJE"
+                android:gravity="center"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/black"
+                android:layout_marginBottom="16dp"/>
+
+            <!-- FILA DISTANCIA -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Distancia"
+                    android:textColor="@color/black"/>
+
+                <TextView
+                    android:id="@+id/tvDistance"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textStyle="bold"
+                    android:textColor="@color/black"/>
+            </LinearLayout>
+
+            <View style="@style/Divider"/>
+
+            <!-- FILA VELOCIDAD -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Velocidad media"
+                    android:textColor="@color/black"/>
+
+                <TextView
+                    android:id="@+id/tvRealSpeed"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textStyle="bold"
+                    android:textColor="@color/black"/>
+            </LinearLayout>
+
+            <View style="@style/Divider"/>
+
+            <!-- FILA CONDUCCIÓN -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Conducción responsable"
+                    android:textColor="@color/black"/>
+
+                <TextView
+                    android:id="@+id/tvEfficiency"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0%"
+                    android:textStyle="bold"
+                    android:textColor="@color/black"/>
+            </LinearLayout>
+
+            <View style="@style/Divider"/>
+
+            <!-- FILA PENALIZACIÓN -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Penalización"
+                    android:textColor="#C62828"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:id="@+id/tvPenalty"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#C62828"
+                    android:textStyle="bold"/>
+            </LinearLayout>
+
+            <!-- ESPACIO -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="24dp"/>
+
+            <!-- PUNTOS -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="PUNTOS GANADOS"
+                android:gravity="center"
+                android:textStyle="bold"
+                android:textColor="@color/black"/>
+
+            <TextView
+                android:id="@+id/tvPoints"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="+0"
+                android:gravity="center"
+                android:textSize="36sp"
+                android:textStyle="bold"
+                android:textColor="@color/driveup_orange"
+                android:layout_marginTop="8dp"/>
+
+            <!-- BOTÓN -->
+            <Button
+                android:id="@+id/btnContinue"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="CONTINUAR"
+                android:layout_marginTop="20dp"
+                android:backgroundTint="@color/driveup_orange"
+                android:textColor="@android:color/white"/>
+
+        </LinearLayout>
+    </LinearLayout>
+
+</FrameLayout>

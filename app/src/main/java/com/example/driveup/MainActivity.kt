@@ -52,6 +52,8 @@ import android.view.inputmethod.InputMethodManager
 import com.example.driveup.navigation.OsmSpeedLimitProvider
 import com.example.driveup.navigation.SpeedLimitManager
 import com.google.firebase.firestore.FieldValue
+import android.view.ViewGroup
+
 
 
 
@@ -1244,71 +1246,53 @@ private fun saveTripResult(tripResult: TripResult) {
 
     private fun showTripSummary(tripResult: TripResult) {
 
-        val view =
-            layoutInflater.inflate(
-                R.layout.dialog_trip_summary,
-                null
-            )
+        val root = findViewById<ViewGroup>(android.R.id.content)
 
+        val view = layoutInflater.inflate(
+            R.layout.dialog_trip_summary,
+            root,
+            false
+        )
 
         // ================= CONVERSIONES =================
 
-        val realKm =
-            tripResult.realDistanceMeters / 1000.0
-
-        val realHours =
-            tripResult.realDurationSeconds / 3600.0
-
+        val realKm = tripResult.realDistanceMeters / 1000.0
+        val realHours = tripResult.realDurationSeconds / 3600.0
 
         // ================= VELOCIDAD MEDIA =================
 
         val realSpeed =
-            if (realHours > 0)
-                realKm / realHours
-            else 0.0
-
+            if (realHours > 0) realKm / realHours else 0.0
 
         // ================= RATIOS =================
 
-        val greenPercent =
-            (tripResult.greenRatio * 100).toInt()
-
-        val penaltyPercent =
-            (tripResult.penalty * 100).toInt()
-
+        val greenPercent = (tripResult.greenRatio * 100).toInt()
+        val penaltyPercent = (tripResult.penalty * 100).toInt()
 
         // ================= TEXTO =================
 
         view.findViewById<TextView>(R.id.tvDistance).text =
-            "Distancia: %.2f km".format(realKm)
+            "%.1f km".format(realKm)
 
         view.findViewById<TextView>(R.id.tvRealSpeed).text =
-            "Velocidad media: %.1f km/h".format(realSpeed)
+            "%.1f km/h".format(realSpeed)
 
         view.findViewById<TextView>(R.id.tvEfficiency).text =
-            "Conducción responsable: $greenPercent%"
+            "$greenPercent%"
 
         view.findViewById<TextView>(R.id.tvPenalty).text =
-            "Penalización: -$penaltyPercent%"
+            "-$penaltyPercent%"
 
         view.findViewById<TextView>(R.id.tvPoints).text =
-            "Puntos ganados: ${tripResult.pointsEarned}"
+            "+${tripResult.pointsEarned}"
 
+        // ================= MOSTRAR OVERLAY =================
 
-        // ================= DIÁLOGO =================
+        root.addView(view)
 
-        val dialog = AlertDialog.Builder(this)
-            .setView(view)
-            .setCancelable(false)
-            .create()
-
-
-        view.findViewById<Button>(R.id.btnContinue)
-            .setOnClickListener {
-                dialog.dismiss()
-            }
-
-        dialog.show()
+        view.findViewById<Button>(R.id.btnContinue).setOnClickListener {
+            root.removeView(view)
+        }
     }
 
 
