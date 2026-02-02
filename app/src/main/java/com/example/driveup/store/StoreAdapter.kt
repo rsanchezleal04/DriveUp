@@ -13,6 +13,10 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.driveup.R
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.bumptech.glide.Glide
+import android.widget.ImageView
+
+
 
 class StoreAdapter(
     private val context: Context,
@@ -30,10 +34,14 @@ class StoreAdapter(
     private val normalColor = ContextCompat.getColor(context, R.color.driveup_orange)
 
     inner class StoreViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val imgItem: ImageView = view.findViewById(R.id.imgItem)
         val tvName: TextView = view.findViewById(R.id.tvItemName)
-        val tvPrice: TextView = view.findViewById(R.id.tvItemPrice)
+        val tvDescription: TextView = view.findViewById(R.id.tvItemDescription)
         val btnBuy: Button = view.findViewById(R.id.btnBuy)
+        val tvPrice: TextView = view.findViewById(R.id.tvItemPrice)
+
     }
+
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): StoreViewHolder {
         val view = LayoutInflater.from(context).inflate(R.layout.item_store, parent, false)
@@ -46,17 +54,24 @@ class StoreAdapter(
         val item = items[position]
 
         holder.tvName.text = item.name
-        holder.tvPrice.text = "${item.price} pts"
+        holder.tvDescription.text = item.description
         holder.btnBuy.text = if (item.purchased) "Ver código" else "Comprar"
+        holder.btnBuy.setBackgroundColor(
+            if (item.purchased) purchasedColor else normalColor
+        )
+        holder.tvPrice.text = "${item.price} pts"
 
-        // Cambiar color según si está comprado
-        holder.btnBuy.setBackgroundColor(if (item.purchased) purchasedColor else normalColor)
+
+        //IMAGEN DESDE FIRESTORE
+        Glide.with(context)
+            .load(item.imageUrl)
+            .placeholder(R.drawable.ic_placeholder_image)
+            .into(holder.imgItem)
 
         holder.btnBuy.setOnClickListener {
             val uid = auth.currentUser?.uid ?: return@setOnClickListener
             val userRef = db.collection("users").document(uid)
 
-            // ===== VER CÓDIGO =====
             if (item.purchased) {
                 val code = codesMap[item.name] ?: "No disponible"
                 android.app.AlertDialog.Builder(context)
@@ -67,20 +82,13 @@ class StoreAdapter(
                 return@setOnClickListener
             }
 
-            // ===== CONFIRMAR COMPRA =====
             android.app.AlertDialog.Builder(context)
                 .setTitle("Confirmar compra")
-                .setMessage("${item.description}\n\n¿Quieres gastar ${item.price} pts?")
+                .setMessage("${item.description}\n\n¿Gastar ${item.price} pts?")
                 .setPositiveButton("Sí") { _, _ ->
-
                     db.runTransaction { transaction ->
                         val snapshot = transaction.get(userRef)
-
                         val currentPoints = snapshot.getLong("points")?.toInt() ?: 0
-                        val purchasedItems =
-                            snapshot.get("purchasedItems") as? MutableList<String> ?: mutableListOf()
-                        val categories =
-                            snapshot.get("categories") as? MutableMap<String, Long> ?: mutableMapOf()
 
                         if (currentPoints < item.price) {
                             throw Exception("No tienes suficientes puntos")
@@ -89,24 +97,15 @@ class StoreAdapter(
                         val newPoints = currentPoints - item.price
                         transaction.update(userRef, "points", newPoints)
 
-                        purchasedItems.add(item.name)
-                        transaction.update(userRef, "purchasedItems", purchasedItems)
-
-                        categories[item.category] = (categories[item.category] ?: 0) + 1
-                        transaction.update(userRef, "categories", categories)
-
-                        // ✅ USAR CÓDIGO DE FIRESTORE
-                        val code = item.code
-                        codesMap[item.name] = code
+                        codesMap[item.name] = item.code
                         transaction.update(userRef, "codes", codesMap)
 
                         item.purchased = true
                         newPoints
                     }
-                        .addOnSuccessListener { newPoints ->
-                            // Actualizar botón y color
+                        .addOnSuccessListener {
                             notifyItemChanged(position)
-                            onPointsUpdated(newPoints)
+                            onPointsUpdated(it)
                         }
                         .addOnFailureListener { e ->
                             Toast.makeText(context, e.message, Toast.LENGTH_SHORT).show()
@@ -116,6 +115,7 @@ class StoreAdapter(
                 .show()
         }
     }
+
 
     /** Permite a la Activity cambiar la lista (orden / filtro) */
     fun updateItems(newItems: List<StoreItem>) {

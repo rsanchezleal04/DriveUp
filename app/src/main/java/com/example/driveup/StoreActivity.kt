@@ -4,7 +4,8 @@ import android.os.Bundle
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.LinearLayoutManager
+//import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.driveup.Models.User
 import com.example.driveup.store.StoreAdapter
@@ -35,7 +36,7 @@ class StoreActivity : AppCompatActivity() {
         "Ropa", "Supermercados", "Gasolina", "Viajes", "Tecnología",
         "Maquillaje y cosmeticos", "Ocio", "Coches", "Gimnasio",
         "Ornamento", "Restaurante", "Libros", "Amazón", "Farmacia",
-        "Talleres", "Cerveza", "HigienePersonal",
+        "Talleres", "Cerveza", "Higiene Personal",
         "Compañia de telefono", "Vinilos", "Transporte"
     )
 
@@ -50,7 +51,7 @@ class StoreActivity : AppCompatActivity() {
 
         btnBack.setOnClickListener { finish() }
 
-        recyclerView.layoutManager = LinearLayoutManager(this)
+        recyclerView.layoutManager = GridLayoutManager(this, 2)
         adapter = StoreAdapter(this, mutableListOf(), userCodes) {
             userPoints = it
             tvPoints.text = "$userPoints pts"

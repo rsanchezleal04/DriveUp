@@ -77,4 +77,7 @@ dependencies {
     // 🎯 Activity Result APIs
     implementation("androidx.activity:activity-ktx:1.8.0")
     implementation("androidx.fragment:fragment-ktx:1.6.2")
+
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+
 }

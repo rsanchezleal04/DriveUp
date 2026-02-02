@@ -8,5 +8,6 @@ data class StoreItem(
     val active: Boolean = true,
     val priority: Int = 0,
     val code: String = "",
+    val imageUrl: String = "",
     var purchased: Boolean = false
 )
