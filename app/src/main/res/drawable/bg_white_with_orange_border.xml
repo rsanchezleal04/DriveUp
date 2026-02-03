@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+
+    <!-- Fondo blanco -->
+    <solid android:color="@android:color/white" />
+
+    <!-- Borde naranja de 2dp -->
+    <stroke
+        android:width="2dp"
+        android:color="@color/driveup_orange" />
+
+    <!-- Esquinas redondeadas -->
+    <corners android:radius="12dp" />
+
+    <!-- Padding para que el contenido no toque el borde -->
+    <padding
+        android:left="4dp"
+        android:top="4dp"
+        android:right="4dp"
+        android:bottom="4dp" />
+
+</shape>

@@ -62,7 +62,7 @@
                 android:visibility="visible"
                 app:tint="@android:color/white"/>
 
-            <!-- Distancia próxima maniobra (SOLO DISTANCIA) -->
+            <!-- Distancia próxima maniobra -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -74,12 +74,20 @@
                     android:id="@+id/tvNextDistance"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="56 m"
+                    android:text="58 m"
                     android:textColor="@android:color/white"
                     android:textSize="22sp"
                     android:textStyle="bold"/>
 
-                <!-- ELIMINADO: TextView tvNextTime -->
+                <!-- Tiempo próximo (como en la imagen) -->
+                <TextView
+                    android:id="@+id/tvNextTime"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="45 min"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp"
+                    android:layout_marginTop="2dp"/>
             </LinearLayout>
 
             <!-- ETA TOTAL (derecha) -->
@@ -105,12 +113,166 @@
                     android:id="@+id/tvTotalDistanceTop"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="240.6 km"
+                    android:text="62.4 km"
                     android:textColor="@android:color/white"
                     android:textSize="14sp"
                     android:layout_marginTop="2dp"
                     android:gravity="end"/>
             </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ================= BOTÓN CANCELAR VIAJE ================= -->
+    <LinearLayout
+        android:id="@+id/cancelButtonContainer"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_white_with_orange_border"
+        android:padding="16dp"
+        android:visibility="gone"
+        android:elevation="12dp"
+        android:layout_margin="14dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <Button
+            android:id="@+id/btnCancelRoute"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="CANCELAR VIAJE"
+            android:textAllCaps="true"
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:backgroundTint="@color/driveup_orange"
+            android:paddingVertical="14dp"
+            android:minHeight="50dp"/>
+    </LinearLayout>
+
+    <!-- ================= PANEL DE VISTA PREVIA ================= -->
+    <LinearLayout
+        android:id="@+id/previewPanel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp"
+        android:visibility="gone"
+        android:elevation="12dp"
+        android:layout_margin="16dp"
+        android:background="@drawable/bg_white_with_orange_border"
+        app:layout_constraintBottom_toTopOf="@id/cancelButtonContainer"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Título -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="VISTA PREVIA DE RUTA"
+            android:textColor="@android:color/black"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="20dp"/>
+
+        <!-- Información tiempo y distancia -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="24dp"
+            android:gravity="center">
+
+            <!-- Información tiempo -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:padding="12dp">
+
+                <TextView
+                    android:id="@+id/tvPreviewTime"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="18h 31m"
+                    android:textColor="@android:color/black"
+                    android:textSize="20sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Tiempo"
+                    android:textColor="#666666"
+                    android:textSize="12sp"/>
+            </LinearLayout>
+
+            <!-- Separador -->
+            <View
+                android:layout_width="1dp"
+                android:layout_height="40dp"
+                android:background="#E0E0E0"/>
+
+            <!-- Información distancia -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:padding="12dp">
+
+                <TextView
+                    android:id="@+id/tvPreviewDistance"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="1725.6 km"
+                    android:textColor="@android:color/black"
+                    android:textSize="20sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Distancia"
+                    android:textColor="#666666"
+                    android:textSize="12sp"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Botones -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <Button
+                android:id="@+id/btnStartFromPreview"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="INICIAR"
+                android:layout_marginEnd="8dp"
+                android:backgroundTint="@color/driveup_orange"
+                android:textColor="@android:color/white"
+                android:paddingHorizontal="24dp"
+                android:minWidth="100dp"
+                android:minHeight="44dp"/>
+
+            <Button
+                android:id="@+id/btnClosePreview"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CERRAR"
+                android:backgroundTint="#666666"
+                android:textColor="@android:color/white"
+                android:paddingHorizontal="24dp"
+                android:minWidth="100dp"
+                android:minHeight="44dp"/>
         </LinearLayout>
     </LinearLayout>
 
@@ -120,14 +282,14 @@
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:layout_marginStart="16dp"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="20dp"
         android:background="@drawable/bg_circle_white"
         android:src="@drawable/ic_menu"
         android:padding="10dp"
         android:elevation="8dp"
         android:contentDescription="Menú"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tripTopBarOrange"/>
+        app:layout_constraintTop_toTopOf="parent"/>
 
     <!-- ================= BOTÓN TIENDA ================= -->
     <FrameLayout
@@ -138,7 +300,8 @@
         android:background="@drawable/bg_circle_white"
         android:elevation="8dp"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tripTopBarOrange">
+        app:layout_constraintTop_toTopOf="parent"
+        android:layout_marginTop="16dp">
 
         <ImageButton
             android:id="@+id/btnStore"
@@ -196,74 +359,150 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toTopOf="@id/routeInputContainer"/>
 
-    <!-- ================= INPUT RUTA ================= -->
+    <!-- ================= INPUT RUTA MEJORADO ================= -->
     <LinearLayout
         android:id="@+id/routeInputContainer"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_margin="14dp"
         android:orientation="vertical"
-        android:padding="14dp"
-        android:background="@drawable/bg_panel_dark"
-        android:elevation="10dp"
-        app:layout_constraintBottom_toBottomOf="parent"
+        android:padding="16dp"
+        android:background="@drawable/bg_white_with_orange_border"
+        android:elevation="12dp"
+        app:layout_constraintBottom_toTopOf="@id/previewPanel"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <com.google.android.material.textfield.TextInputLayout
+        <!-- Origen (con etiqueta "ORIGEN:" a la izquierda) -->
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
 
-            <AutoCompleteTextView
-                android:id="@+id/etOrigin"
-                android:layout_width="match_parent"
+            <!-- Etiqueta ORIGEN con ancho fijo para igualar tamaño -->
+            <TextView
+                android:layout_width="80dp"
                 android:layout_height="wrap_content"
-                android:hint="Mi ubicación"
-                android:textColor="@android:color/white"/>
-        </com.google.android.material.textfield.TextInputLayout>
+                android:text="ORIGEN:"
+                android:textColor="@color/driveup_orange"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:gravity="end"
+                android:layout_marginEnd="12dp"/>
 
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp">
-
-            <AutoCompleteTextView
-                android:id="@+id/etDestination"
-                android:layout_width="match_parent"
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:hint="Destino"
-                android:textColor="@android:color/white"/>
-        </com.google.android.material.textfield.TextInputLayout>
+                android:layout_weight="1"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:boxStrokeColor="@color/driveup_orange"
+                app:hintTextColor="@android:color/black"
+                app:boxStrokeWidth="2dp"
+                app:boxCornerRadiusTopStart="8dp"
+                app:boxCornerRadiusTopEnd="8dp"
+                app:boxCornerRadiusBottomStart="8dp"
+                app:boxCornerRadiusBottomEnd="8dp">
 
-        <Button
-            android:id="@+id/btnRoute"
+                <AutoCompleteTextView
+                    android:id="@+id/etOrigin"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Mi ubicación"
+                    android:textColor="@android:color/black"
+                    android:backgroundTint="@color/driveup_orange"/>
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
+
+        <!-- Destino (con etiqueta "DESTINO:" a la izquierda) -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Iniciar ruta"
-            android:backgroundTint="@color/driveup_orange"
-            android:textColor="@android:color/white"/>
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
 
-        <Button
-            android:id="@+id/btnPreviewRoute"
+            <!-- Etiqueta DESTINO con MISMO ancho fijo -->
+            <TextView
+                android:layout_width="80dp"
+                android:layout_height="wrap_content"
+                android:text="DESTINO:"
+                android:textColor="@color/driveup_orange"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:gravity="end"
+                android:layout_marginEnd="12dp"/>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:boxStrokeColor="@color/driveup_orange"
+                app:hintTextColor="@android:color/black"
+                app:boxStrokeWidth="2dp"
+                app:boxCornerRadiusTopStart="8dp"
+                app:boxCornerRadiusTopEnd="8dp"
+                app:boxCornerRadiusBottomStart="8dp"
+                app:boxCornerRadiusBottomEnd="8dp">
+
+                <AutoCompleteTextView
+                    android:id="@+id/etDestination"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Introduce destino"
+                    android:textColor="@android:color/black"
+                    android:backgroundTint="@color/driveup_orange"/>
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
+
+        <!-- Botones en horizontal -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Ver ruta"
-            android:layout_marginTop="4dp"
-            android:backgroundTint="@color/driveup_orange"
-            android:textColor="@android:color/white"/>
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
 
+            <!-- Botón Iniciar Ruta -->
+            <Button
+                android:id="@+id/btnRoute"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="Iniciar ruta"
+                android:backgroundTint="@color/driveup_orange"
+                android:textColor="@android:color/white"
+                android:minHeight="48dp"/>
+
+            <!-- Botón Ver Ruta -->
+            <Button
+                android:id="@+id/btnPreviewRoute"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="Ver ruta"
+                android:backgroundTint="@color/driveup_orange"
+                android:textColor="@android:color/white"
+                android:minHeight="48dp"/>
+        </LinearLayout>
+
+        <!-- Botón Cancelar OLD (OCULTO, se movió al panel) -->
         <Button
-            android:id="@+id/btnCancelRoute"
+            android:id="@+id/btnCancelRouteOld"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Cancelar ruta"
+            android:layout_marginTop="8dp"
             android:backgroundTint="#B00020"
             android:textColor="@android:color/white"
-            android:visibility="gone"/>
+            android:visibility="gone"
+            android:minHeight="48dp"/>
     </LinearLayout>
 
-    <!-- ================= BARRA INFERIOR (PARA PREVIEW) ================= -->
+    <!-- ================= BARRA INFERIOR ANTIGUA ================= -->
     <LinearLayout
         android:id="@+id/navigationBar"
         android:layout_width="0dp"
@@ -331,5 +570,4 @@
                 android:textColor="@android:color/white"/>
         </LinearLayout>
     </LinearLayout>
-
 </androidx.constraintlayout.widget.ConstraintLayout>

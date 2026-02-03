@@ -121,6 +121,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var ivTurnIconSmall: ImageView
     private lateinit var tvTotalDistanceTop: TextView
     private lateinit var btnCancelRoute: Button
+    private lateinit var previewPanel: LinearLayout
+    private lateinit var tvPreviewTime: TextView
+    private lateinit var tvPreviewDistance: TextView
+    private lateinit var btnStartFromPreview: Button
+    private lateinit var btnClosePreview: Button
+    private lateinit var routeInputContainer: LinearLayout
+    private lateinit var cancelButtonContainer: LinearLayout
+
 
 
 
@@ -159,6 +167,13 @@ class MainActivity : AppCompatActivity() {
         ivTurnIconSmall = findViewById(R.id.ivTurnIconSmall)
         tvTotalDistanceTop = findViewById(R.id.tvTotalDistanceTop)
         btnCancelRoute = findViewById(R.id.btnCancelRoute)
+        previewPanel = findViewById(R.id.previewPanel)
+        tvPreviewTime = findViewById(R.id.tvPreviewTime)
+        tvPreviewDistance = findViewById(R.id.tvPreviewDistance)
+        btnStartFromPreview = findViewById(R.id.btnStartFromPreview)
+        btnClosePreview = findViewById(R.id.btnClosePreview)
+        routeInputContainer = findViewById(R.id.routeInputContainer)
+        cancelButtonContainer = findViewById(R.id.cancelButtonContainer)
 
         fusedLocation = LocationServices.getFusedLocationProviderClient(this)
 
@@ -215,6 +230,13 @@ class MainActivity : AppCompatActivity() {
             confirmCancelRoute()
         }
 
+        btnStartFromPreview.setOnClickListener {
+            startNavigationFromPreview()
+        }
+
+        btnClosePreview.setOnClickListener {
+            exitPreview()
+        }
 
 
         findViewById<Button>(R.id.btnCancelRoute).setOnClickListener {
@@ -237,8 +259,41 @@ class MainActivity : AppCompatActivity() {
         // ================= AUTOCOMPLETADO =================
         setupAutocomplete(etDestination)
         setupAutocomplete(etOrigin)
+
+
+        updateStoreVisibility()
     }
 
+    //============================== AUX A ONCREATE =================================
+    private fun startNavigationFromPreview() {
+        if (!previewing || destinationLatLng == null) return
+
+        // IMPORTANTE: Recalcular desde ubicación actual, no desde origen del preview
+        val currentLoc = currentLocation
+        if (currentLoc == null) {
+            toast("No se puede obtener ubicación actual")
+            return
+        }
+
+        // Ocultar panel de preview
+        previewPanel.visibility = View.GONE
+
+        // Cambiar a modo navegación (esto recalculará la ruta desde ubicación actual)
+        previewing = false
+        navigating = true
+
+        // Iniciar navegación desde ubicación actual
+        val originLatLng = LatLng(currentLoc.latitude, currentLoc.longitude)
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            fetchRoute(originLatLng, destinationLatLng!!)
+        }
+
+        // Iniciar stats de viaje
+        tripStatsManager.startTrip()
+
+        toast("Navegación iniciada desde tu ubicación actual")
+    }
 
 
     // ================= PERMISOS =================
@@ -487,28 +542,37 @@ class MainActivity : AppCompatActivity() {
         previewing = false
         updateStoreVisibility()
 
-        // Ocultar inputs
-        etOrigin.clearFocus()
-        etDestination.clearFocus()
-        etOrigin.visibility = View.GONE
-        etDestination.visibility = View.GONE
-        btnRoute.visibility = View.GONE
-        btnPreviewRoute.visibility = View.GONE
+        runOnUiThread {
+            // Ocultar inputs
+            etOrigin.clearFocus()
+            etDestination.clearFocus()
+            etOrigin.visibility = View.GONE
+            etDestination.visibility = View.GONE
+            btnRoute.visibility = View.GONE
+            btnPreviewRoute.visibility = View.GONE
 
-        // Desactivar autocompletado y habilitar inputs
-        etDestination.dismissDropDown()
-        etDestination.isEnabled = true
-        etOrigin.isEnabled = true
+            // Ocultar panel de preview si está visible
+            previewPanel.visibility = View.GONE
 
-        // Mostrar barra naranja de navegación
-        tripTopBarOrange.visibility = View.VISIBLE
+            // Ocultar inputs container
+            routeInputContainer.visibility = View.GONE
 
-        // Ocultar barra inferior (la usaremos solo para preview)
-        navigationBar.visibility = View.GONE
+            // Desactivar autocompletado y habilitar inputs
+            etDestination.dismissDropDown()
+            etDestination.isEnabled = true
+            etOrigin.isEnabled = true
 
-        // Mostrar botón cancelar
-        btnCancelRoute.visibility = View.VISIBLE
+            // Mostrar barra naranja de navegación
+            tripTopBarOrange.visibility = View.VISIBLE
+
+            // Ocultar barra inferior
+            navigationBar.visibility = View.GONE
+
+            // Mostrar botón cancelar CON NUEVO DISEÑO
+            cancelButtonContainer.visibility = View.VISIBLE
+        }
     }
+
 
     /*private fun cancelRoute() {
 
@@ -567,7 +631,6 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun cancelRouteWithSummary() {
-
         if (!navigating) return
 
         navigating = false
@@ -577,6 +640,8 @@ class MainActivity : AppCompatActivity() {
         // Ocultar barra naranja
         tripTopBarOrange.visibility = View.GONE
 
+        // OCULTAR CONTENEDOR DEL BOTÓN CANCELAR
+        cancelButtonContainer.visibility = View.GONE
 
         // Finalizar viaje
         val tripResult = tripStatsManager.finishTrip()
@@ -594,15 +659,19 @@ class MainActivity : AppCompatActivity() {
         tvStepDistance.text = ""
         tvEta.text = ""
 
+        // MOSTRAR routeInputContainer COMPLETO (con inputs)
+        routeInputContainer.visibility = View.VISIBLE
         etOrigin.visibility = View.VISIBLE
         etDestination.visibility = View.VISIBLE
         btnRoute.visibility = View.VISIBLE
+        btnPreviewRoute.visibility = View.VISIBLE
 
         etDestination.isEnabled = true
         etDestination.text.clear()
         etOrigin.text.clear()
 
-        findViewById<View>(R.id.btnCancelRoute).visibility = View.GONE
+        // ELIMINA esta línea ya que el botón está dentro del contenedor:
+        // btnCancelRoute.visibility = View.GONE
 
         btnPreviewRoute.visibility = View.VISIBLE
         showTripSummary(tripResult)
@@ -611,28 +680,20 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun drawRoute(json: String) {
-
         if (!mapReady) return
 
         val route = JSONObject(json)
             .getJSONArray("routes")
             .getJSONObject(0)
 
-
         // ================= DISTANCIA / ETA =================
-
         val distanceMeters = route.getDouble("distance")
         val durationSeconds = route.getDouble("duration")
 
         val distanceKm = distanceMeters / 1000
         val durationMin = durationSeconds / 60
 
-        tvEta.text = formatTime(distanceKm, durationMin)
-        navigationBar.visibility = View.VISIBLE
-
-
         // ================= GEOMETRÍA =================
-
         val coords = route
             .getJSONObject("geometry")
             .getJSONArray("coordinates")
@@ -641,16 +702,13 @@ class MainActivity : AppCompatActivity() {
         val latLngs = mutableListOf<LatLng>()
 
         for (i in 0 until coords.length()) {
-
             val c = coords.getJSONArray(i)
-
             points.add(
                 Point.fromLngLat(
                     c.getDouble(0),
                     c.getDouble(1)
                 )
             )
-
             latLngs.add(
                 LatLng(
                     c.getDouble(1),
@@ -661,13 +719,9 @@ class MainActivity : AppCompatActivity() {
 
         routePoints = latLngs
 
-
         // ================= DIBUJAR RUTA =================
-
         map.getStyle { style ->
-
             if (style.getSource("route") == null) {
-
                 style.addSource(
                     GeoJsonSource(
                         "route",
@@ -682,9 +736,7 @@ class MainActivity : AppCompatActivity() {
                             lineWidth(6f)
                         )
                 )
-
             } else {
-
                 (style.getSource("route") as GeoJsonSource)
                     .setGeoJson(
                         LineString.fromLngLats(points)
@@ -692,65 +744,63 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-
-        // ================= PREVIEW =================
-
+        // ================= MODO PREVIEW =================
         if (previewing) {
+            runOnUiThread {
+                // Actualizar panel de preview (nuevo diseño simplificado)
+                tvPreviewTime.text = formatTimeForPreview(durationMin)
+                tvPreviewDistance.text = "%.1f km".format(distanceKm)
 
-            tvInstruction.text = "Vista previa de la ruta"
-            tvStepDistance.text = ""
+                // Mostrar panel de preview y ocultar otros elementos
+                previewPanel.visibility = View.VISIBLE
+                navigationBar.visibility = View.GONE
+                tripTopBarOrange.visibility = View.GONE
+                routeInputContainer.visibility = View.GONE
 
+                // Ocultar tienda en modo preview
+                updateStoreVisibility()
+            }
             return
         }
 
+        // ================= MODO NAVEGACIÓN =================
+        runOnUiThread {
+            tvEta.text = formatTime(distanceKm, durationMin)
+            navigationBar.visibility = View.VISIBLE
+        }
 
         // ================= TRIP STATS =================
-        // Solo iniciamos viaje la primera vez
-
         if (!isRecalculating) {
             tripStatsManager.startTrip()
         }
-
         isRecalculating = false
 
-
         // ================= ESTADO =================
-
         onNavigationStarted()
-
         arrived = false
         navigating = true
 
-
         // ================= INSTRUCCIONES =================
-
         val legs = route.getJSONArray("legs")
         val stepsJson = legs.getJSONObject(0).getJSONArray("steps")
 
         val steps = mutableListOf<NavigationStep>()
-
         for (i in 0 until stepsJson.length()) {
-
             val step = stepsJson.getJSONObject(i)
-
             val maneuver = step.getJSONObject("maneuver")
 
             val type = maneuver.getString("type")
             val modifier = maneuver.optString("modifier", "")
             val name = step.optString("name", "")
-
             val distance = step.getDouble("distance")
 
             val loc = maneuver.getJSONArray("location")
-
             val latLng = LatLng(
                 loc.getDouble(1),
                 loc.getDouble(0)
             )
 
-            val instruction =
-                buildInstruction(type, modifier, name)
-
+            val instruction = buildInstruction(type, modifier, name)
             steps.add(
                 NavigationStep(
                     instruction = instruction,
@@ -763,14 +813,30 @@ class MainActivity : AppCompatActivity() {
         navigationSteps = steps
         currentStepIndex = 0
 
+        runOnUiThread {
+            if (navigationSteps.isNotEmpty()) {
+                val first = navigationSteps[0]
+                tvInstruction.text = first.instruction
+                updateTurnIcon(first.instruction)
 
-        if (navigationSteps.isNotEmpty()) {
+                // Actualizar barra superior
+                tvInstructionTop.text = first.instruction
+                tvNextDistance.text = "${first.distance.toInt()} m"
+                updateTurnIconSmall(first.instruction)
+            }
 
-            val first = navigationSteps[0]
+            // Actualizar ETA en barra superior
+            val mins = durationMin.toInt()
+            tvEtaTop.text = when {
+                mins > 60 -> "${mins/60}h ${mins%60}m"
+                else -> "$mins min"
+            }
 
-            tvInstruction.text = first.instruction
-
-            updateTurnIcon(first.instruction)
+            // Actualizar distancia total en barra superior
+            tvTotalDistanceTop.text = when {
+                distanceKm < 1 -> "${(distanceKm * 1000).toInt()} m"
+                else -> "%.1f km".format(distanceKm)
+            }
         }
     }
 
@@ -941,6 +1007,8 @@ class MainActivity : AppCompatActivity() {
         // Ocultar barra naranja
         tripTopBarOrange.visibility = View.GONE
 
+        // OCULTAR CONTENEDOR DEL BOTÓN CANCELAR
+        cancelButtonContainer.visibility = View.GONE
 
         toast("Has llegado a tu destino")
 
@@ -963,7 +1031,6 @@ class MainActivity : AppCompatActivity() {
 
         speedManager.reset()
         tvSpeed.text = "0"
-
     }
 
     private fun clearRoute() {
@@ -1115,8 +1182,6 @@ class MainActivity : AppCompatActivity() {
         tvNextDistance.text = "$distance m"
 
         // Calcular tiempo aproximado basado en velocidad actual
-        val speedMps = speedManager.getCurrentSpeed() / 3.6 // convertir km/h a m/s
-        val timeSeconds = if (speedMps > 0.5) distance / speedMps else distance / 2.0 // 2 m/s como velocidad mínima
 
         // Actualizar icono pequeño
         updateTurnIconSmall(step.instruction)
@@ -1374,7 +1439,6 @@ private fun saveTripResult(tripResult: TripResult) {
         }
 
         lifecycleScope.launch(Dispatchers.IO) {
-
             val origin: LatLng = if (originText.isEmpty()) {
                 val loc = currentLocation
                 if (loc == null) {
@@ -1389,35 +1453,29 @@ private fun saveTripResult(tripResult: TripResult) {
 
             val dest = geocode(destText) ?: return@launch
 
-            // Cambiamos estado
             previewing = true
             navigating = false
             destinationLatLng = dest
 
             withContext(Dispatchers.Main) {
-                // Cambiar texto del botón
-                btnPreviewRoute.text = "Dejar de ver ruta"
+                // Solo mostrar panel de preview
+                previewPanel.visibility = View.VISIBLE
+                routeInputContainer.visibility = View.GONE
 
-                // UI para modo preview
-                tripTopBarOrange.visibility = View.GONE  // Ocultar barra naranja
-                navigationBar.visibility = View.VISIBLE  // Mostrar barra inferior
-                ivTurnIcon.visibility = View.GONE        // Ocultar icono grande
-                btnMute.visibility = View.GONE           // Ocultar mute en preview
+                // Ocultar tienda
+                updateStoreVisibility()
 
-                // Mostrar inputs
-                etOrigin.visibility = View.VISIBLE
-                etDestination.visibility = View.VISIBLE
-                btnRoute.visibility = View.VISIBLE
-                btnCancelRoute.visibility = View.GONE    // Ocultar botón cancelar en preview
+                // Ocultar otras barras
+                tripTopBarOrange.visibility = View.GONE
+                navigationBar.visibility = View.GONE
 
-                // Asegurar que los inputs estén deshabilitados para solo lectura
-                etOrigin.isEnabled = false
-                etDestination.isEnabled = false
+                btnPreviewRoute.text = "Ver ruta"
             }
 
             fetchRoute(origin, dest)
         }
     }
+
 
 
 
@@ -1447,23 +1505,20 @@ private fun saveTripResult(tripResult: TripResult) {
         routePoints = emptyList()
         destinationLatLng = null
 
-        // Restaurar UI
-        navigationBar.visibility = View.GONE
-        tripTopBarOrange.visibility = View.GONE
-        tvEta.text = ""
-        tvInstruction.text = ""
-        tvStepDistance.text = ""
+        runOnUiThread {
+            // Ocultar panel de preview
+            previewPanel.visibility = View.GONE
 
-        // Restaurar botones
-        btnPreviewRoute.text = "Ver ruta"
-        btnCancelRoute.visibility = View.GONE
+            // Mostrar inputs de ruta
+            routeInputContainer.visibility = View.VISIBLE
 
-        // Habilitar inputs
-        etOrigin.visibility = View.VISIBLE
-        etDestination.visibility = View.VISIBLE
-        btnRoute.visibility = View.VISIBLE
-        etOrigin.isEnabled = true
-        etDestination.isEnabled = true
+            // Restaurar visibilidad de tienda (modo normal)
+            updateStoreVisibility()
+
+            // Limpiar texto (solo tiempo y distancia, no calles)
+            tvPreviewTime.text = ""
+            tvPreviewDistance.text = ""
+        }
 
         toast("Vista previa cancelada")
     }
@@ -1590,8 +1645,10 @@ private fun saveTripResult(tripResult: TripResult) {
 
     //================================ TIENDA =================================
     private fun updateStoreVisibility() {
-        btnStore.visibility =
-            if (!navigating && !previewing) View.VISIBLE else View.GONE
+        val shouldShow = !navigating && !previewing
+        findViewById<FrameLayout>(R.id.storeButtonContainer)?.visibility =
+            if (shouldShow) View.VISIBLE else View.GONE
+        btnStore.visibility = if (shouldShow) View.VISIBLE else View.GONE
     }
 
 
@@ -1611,6 +1668,16 @@ private fun saveTripResult(tripResult: TripResult) {
             else -> "${(timeSeconds / 60).toInt()} min"
         }
     }
+
+
+    private fun formatTimeForPreview(minutes: Double): String {
+        val mins = minutes.toInt()
+        return when {
+            mins >= 60 -> "${mins/60}h ${mins%60}m"
+            else -> "$mins min"
+        }
+    }
+
 
     private fun toast(msg: String) =
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
