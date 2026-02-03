@@ -53,7 +53,7 @@ import com.example.driveup.navigation.OsmSpeedLimitProvider
 import com.example.driveup.navigation.SpeedLimitManager
 import com.google.firebase.firestore.FieldValue
 import android.view.ViewGroup
-
+import android.graphics.Color
 
 
 
@@ -1526,41 +1526,41 @@ private fun saveTripResult(tripResult: TripResult) {
 
     //======================= AUTOCOMPLETADO ===============================
     private fun setupAutocomplete(editText: AutoCompleteTextView) {
-
         var searchJob: Job? = null
         var autocompleteLocked = false
 
-        // ================= CAMBIO DE TEXTO =================
+        // ================= CAMBIO 1: Configurar la ventana del dropdown =================
+        editText.dropDownWidth = ViewGroup.LayoutParams.MATCH_PARENT
+        editText.dropDownHeight = ViewGroup.LayoutParams.WRAP_CONTENT
+        editText.dropDownVerticalOffset = 0
+        editText.dropDownHorizontalOffset = 0
+
+        // Estilo para el dropdown (opcional, ayuda con el rendimiento)
+        editText.setDropDownBackgroundDrawable(
+            ContextCompat.getDrawable(this, android.R.drawable.dialog_holo_light_frame)
+        )
+
+        // ================= CAMBIO 2: TextWatcher optimizado =================
         editText.addTextChangedListener(object : TextWatcher {
-
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                // Si el usuario escribe o borra → desbloqueamos autocomplete
                 if (before > 0 || count > 0) {
                     autocompleteLocked = false
                 }
             }
 
             override fun afterTextChanged(s: Editable?) {
-
-                // No buscamos si:
-                // - no tiene foco
-                // - está bloqueado
                 if (!editText.isFocused || autocompleteLocked) return
 
                 val query = s.toString().trim()
-
-                // Muy corto → nada de sugerencias
                 if (query.length < 3) {
                     editText.dismissDropDown()
                     return
                 }
 
-                // Cancelamos búsquedas anteriores
                 searchJob?.cancel()
                 searchJob = lifecycleScope.launch(Dispatchers.IO) {
-                    delay(300) // debounce
+                    delay(400) // Aumentar debounce a 400ms
 
                     try {
                         val url =
@@ -1581,14 +1581,37 @@ private fun saveTripResult(tripResult: TripResult) {
                         }
 
                         withContext(Dispatchers.Main) {
-                            val adapter = ArrayAdapter(
+                            // CAMBIO 3: Verificar que el editText aún esté enfocado
+                            if (!editText.isFocused || autocompleteLocked) return@withContext
+
+                            // ADAPTADOR CON COLORES PERSONALIZADOS (SOLO CAMBIO)
+                            val adapter = object : ArrayAdapter<String>(
                                 this@MainActivity,
                                 android.R.layout.simple_dropdown_item_1line,
+                                android.R.id.text1,
                                 suggestions
-                            )
+                            ) {
+                                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                                    val view = super.getView(position, convertView, parent)
+                                    val textView = view.findViewById<TextView>(android.R.id.text1)
+                                    textView.setTextColor(Color.BLACK)  // Texto negro
+                                    textView.setBackgroundColor(Color.WHITE)  // Fondo blanco
+                                    return view
+                                }
+
+                                override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
+                                    val view = super.getDropDownView(position, convertView, parent)
+                                    val textView = view.findViewById<TextView>(android.R.id.text1)
+                                    textView.setTextColor(Color.BLACK)  // Texto negro en dropdown
+                                    textView.setBackgroundColor(Color.WHITE)  // Fondo blanco en dropdown
+                                    return view
+                                }
+                            }
+
                             editText.setAdapter(adapter)
 
-                            if (!autocompleteLocked && editText.isFocused) {
+                            // Mostrar dropdown solo si hay sugerencias
+                            if (suggestions.isNotEmpty() && !autocompleteLocked && editText.isFocused) {
                                 editText.showDropDown()
                             }
                         }
@@ -1598,41 +1621,49 @@ private fun saveTripResult(tripResult: TripResult) {
             }
         })
 
-        // ================= SELECCIÓN DE SUGERENCIA =================
+        // ================= CAMBIO 4: Manejo de selección mejorado =================
         editText.setOnItemClickListener { parent, _, position, _ ->
-
             val selected = parent.getItemAtPosition(position) as String
 
             autocompleteLocked = true
             editText.setText(selected)
             editText.setSelection(selected.length)
 
+            // CAMBIO: Ocultar dropdown inmediatamente
             editText.dismissDropDown()
-            editText.clearFocus()
-            hideKeyboard(editText)
+
+            // CAMBIO: Pequeño delay antes de quitar el foco y ocultar teclado
+            editText.postDelayed({
+                editText.clearFocus()
+                hideKeyboard(editText)
+            }, 50) // 50ms de delay
         }
 
-        // ================= ENTER / ✓ DEL TECLADO =================
+        // ================= CAMBIO 5: EditorActionListener optimizado =================
         editText.setOnEditorActionListener { _, _, _ ->
             autocompleteLocked = true
             editText.dismissDropDown()
-            editText.clearFocus()
-            hideKeyboard(editText)
+
+            // Pequeño delay
+            editText.postDelayed({
+                editText.clearFocus()
+                hideKeyboard(editText)
+            }, 50)
             true
         }
 
-        // ================= CLICK EN EL CAMPO =================
-        // Permite volver a escribir si el usuario se equivocó
-        editText.setOnClickListener {
-            autocompleteLocked = false
-            editText.requestFocus()
-        }
-
-        // ================= CLICK FUERA =================
+        // ================= CAMBIO 6: FocusChangeListener mejorado =================
         editText.setOnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) {
                 editText.dismissDropDown()
+                // No ocultamos el teclado aquí para evitar conflictos
             }
+        }
+
+        // ================= CAMBIO 7: ClickListener simplificado =================
+        editText.setOnClickListener {
+            autocompleteLocked = false
+            // No pedir focus automáticamente, dejar que el usuario lo haga
         }
     }
 
