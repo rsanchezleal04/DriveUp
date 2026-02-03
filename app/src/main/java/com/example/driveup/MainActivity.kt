@@ -114,6 +114,14 @@ class MainActivity : AppCompatActivity() {
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseFirestore.getInstance()
     private lateinit var btnStore: ImageButton
+    private lateinit var tripTopBarOrange: LinearLayout
+    private lateinit var tvInstructionTop: TextView
+    private lateinit var tvNextDistance: TextView
+    private lateinit var tvEtaTop: TextView
+    private lateinit var ivTurnIconSmall: ImageView
+    private lateinit var tvTotalDistanceTop: TextView
+    private lateinit var btnCancelRoute: Button
+
 
 
     private val permissionLauncher =
@@ -144,6 +152,13 @@ class MainActivity : AppCompatActivity() {
         ivTurnIcon = findViewById(R.id.ivTurnIcon)
         btnMute = findViewById(R.id.btnMute)
         tvSpeed = findViewById(R.id.tvSpeed)
+        tripTopBarOrange = findViewById(R.id.tripTopBarOrange)
+        tvInstructionTop = findViewById(R.id.tvInstructionTop)
+        tvNextDistance = findViewById(R.id.tvNextDistance)
+        tvEtaTop = findViewById(R.id.tvEtaTop)
+        ivTurnIconSmall = findViewById(R.id.ivTurnIconSmall)
+        tvTotalDistanceTop = findViewById(R.id.tvTotalDistanceTop)
+        btnCancelRoute = findViewById(R.id.btnCancelRoute)
 
         fusedLocation = LocationServices.getFusedLocationProviderClient(this)
 
@@ -196,6 +211,10 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, StoreActivity::class.java))
         }
 
+        btnCancelRoute.setOnClickListener {
+            confirmCancelRoute()
+        }
+
 
 
         findViewById<Button>(R.id.btnCancelRoute).setOnClickListener {
@@ -206,6 +225,7 @@ class MainActivity : AppCompatActivity() {
         btnSettings.setOnClickListener {
             showSettingsMenu(it)
         }
+
 
         // ================= TTS =================
         tts = TextToSpeech(this) {
@@ -464,22 +484,30 @@ class MainActivity : AppCompatActivity() {
 
     private fun onNavigationStarted() {
         navigating = true
+        previewing = false
         updateStoreVisibility()
 
         // Ocultar inputs
         etOrigin.clearFocus()
         etDestination.clearFocus()
-
         etOrigin.visibility = View.GONE
         etDestination.visibility = View.GONE
         btnRoute.visibility = View.GONE
-
-        // MUY IMPORTANTE: desactivar autocompletado
-        etDestination.dismissDropDown()
-        etDestination.isEnabled = false
-
-        findViewById<View>(R.id.btnCancelRoute).visibility = View.VISIBLE
         btnPreviewRoute.visibility = View.GONE
+
+        // Desactivar autocompletado y habilitar inputs
+        etDestination.dismissDropDown()
+        etDestination.isEnabled = true
+        etOrigin.isEnabled = true
+
+        // Mostrar barra naranja de navegación
+        tripTopBarOrange.visibility = View.VISIBLE
+
+        // Ocultar barra inferior (la usaremos solo para preview)
+        navigationBar.visibility = View.GONE
+
+        // Mostrar botón cancelar
+        btnCancelRoute.visibility = View.VISIBLE
     }
 
     /*private fun cancelRoute() {
@@ -545,6 +573,9 @@ class MainActivity : AppCompatActivity() {
         navigating = false
         arrived = false
         updateStoreVisibility()
+
+        // Ocultar barra naranja
+        tripTopBarOrange.visibility = View.GONE
 
 
         // Finalizar viaje
@@ -823,11 +854,10 @@ class MainActivity : AppCompatActivity() {
         lastEtaUpdate = System.currentTimeMillis()
 
         lifecycleScope.launch(Dispatchers.IO) {
-            val url =
-                "https://router.project-osrm.org/route/v1/driving/" +
-                        "${loc.longitude},${loc.latitude};" +
-                        "${destinationLatLng!!.longitude},${destinationLatLng!!.latitude}" +
-                        "?overview=false"
+            val url = "https://router.project-osrm.org/route/v1/driving/" +
+                    "${loc.longitude},${loc.latitude};" +
+                    "${destinationLatLng!!.longitude},${destinationLatLng!!.latitude}" +
+                    "?overview=false"
 
             val res = client.newCall(Request.Builder().url(url).build())
                 .execute().body?.string() ?: return@launch
@@ -836,11 +866,28 @@ class MainActivity : AppCompatActivity() {
                 .getJSONArray("routes")
                 .getJSONObject(0)
 
-            val km = route.getDouble("distance") / 1000
-            val min = route.getDouble("duration") / 60
+            val distanceMeters = route.getDouble("distance")
+            val durationSeconds = route.getDouble("duration")
+
+            val distanceKm = distanceMeters / 1000
+            val durationMin = durationSeconds / 60
 
             runOnUiThread {
-                tvEta.text = formatTime(km, min)
+                // Actualizar ETA en barra superior
+                val mins = durationMin.toInt()
+                tvEtaTop.text = when {
+                    mins > 60 -> "${mins/60}h ${mins%60}m"
+                    else -> "$mins min"
+                }
+
+                // Actualizar distancia total en barra superior
+                tvTotalDistanceTop.text = when {
+                    distanceKm < 1 -> "${(distanceKm * 1000).toInt()} m"
+                    else -> "%.1f km".format(distanceKm)
+                }
+
+                // También actualizar en barra inferior (para preview)
+                tvEta.text = formatTime(distanceKm, durationMin)
             }
         }
     }
@@ -890,6 +937,9 @@ class MainActivity : AppCompatActivity() {
         arrived = true
         navigating = false
         updateStoreVisibility()
+
+        // Ocultar barra naranja
+        tripTopBarOrange.visibility = View.GONE
 
 
         toast("Has llegado a tu destino")
@@ -1053,7 +1103,6 @@ class MainActivity : AppCompatActivity() {
         if (currentStepIndex >= navigationSteps.size) return
 
         val step = navigationSteps[currentStepIndex]
-
         val stepLoc = Location("").apply {
             latitude = step.location.latitude
             longitude = step.location.longitude
@@ -1061,38 +1110,54 @@ class MainActivity : AppCompatActivity() {
 
         val distance = loc.distanceTo(stepLoc).toInt()
 
+        // Actualizar barra superior
+        tvInstructionTop.text = step.instruction
+        tvNextDistance.text = "$distance m"
+
+        // Calcular tiempo aproximado basado en velocidad actual
+        val speedMps = speedManager.getCurrentSpeed() / 3.6 // convertir km/h a m/s
+        val timeSeconds = if (speedMps > 0.5) distance / speedMps else distance / 2.0 // 2 m/s como velocidad mínima
+
+        // Actualizar icono pequeño
+        updateTurnIconSmall(step.instruction)
+
+        // Resto del código de avisos por voz...
         // ================= AVISO PREVIO =================
         if (distance in 40..100 && !step.preAnnounced) {
             step.preAnnounced = true
-
             val msg = "En $distance metros, ${step.instruction}"
-            tvInstruction.text = msg
             speak(msg)
-            updateTurnIconFromInstruction(step)
         }
 
         // ================= AVISO FINAL =================
         if (distance <= 25 && !step.finalAnnounced) {
             step.finalAnnounced = true
-
             val msg = "Ahora, ${step.instruction}"
-            tvInstruction.text = msg
             speak(msg)
-            updateTurnIconFromInstruction(step)
         }
 
         // ================= PASO COMPLETADO =================
         if (distance <= 15) {
             currentStepIndex++
-
             if (currentStepIndex < navigationSteps.size) {
                 val next = navigationSteps[currentStepIndex]
-                tvInstruction.text = next.instruction
-                updateTurnIconFromInstruction(next)
+                updateTurnIconSmall(next.instruction)
             }
         }
     }
 
+    private fun updateTurnIconSmall(instruction: String) {
+        when {
+            instruction.contains("izquierda", true) ->
+                ivTurnIconSmall.setImageResource(R.drawable.ic_turn_left)
+            instruction.contains("derecha", true) ->
+                ivTurnIconSmall.setImageResource(R.drawable.ic_turn_right)
+            instruction.contains("recto", true) ->
+                ivTurnIconSmall.setImageResource(R.drawable.ic_straight)
+            else -> ivTurnIconSmall.setImageResource(android.R.drawable.ic_menu_directions)
+        }
+        ivTurnIconSmall.visibility = View.VISIBLE
+    }
 
     private fun updateStepDistance(loc: Location) {
         if (navigationSteps.isEmpty()) return
@@ -1327,12 +1392,27 @@ private fun saveTripResult(tripResult: TripResult) {
             // Cambiamos estado
             previewing = true
             navigating = false
-
             destinationLatLng = dest
 
-            // Cambiar texto del botón
             withContext(Dispatchers.Main) {
+                // Cambiar texto del botón
                 btnPreviewRoute.text = "Dejar de ver ruta"
+
+                // UI para modo preview
+                tripTopBarOrange.visibility = View.GONE  // Ocultar barra naranja
+                navigationBar.visibility = View.VISIBLE  // Mostrar barra inferior
+                ivTurnIcon.visibility = View.GONE        // Ocultar icono grande
+                btnMute.visibility = View.GONE           // Ocultar mute en preview
+
+                // Mostrar inputs
+                etOrigin.visibility = View.VISIBLE
+                etDestination.visibility = View.VISIBLE
+                btnRoute.visibility = View.VISIBLE
+                btnCancelRoute.visibility = View.GONE    // Ocultar botón cancelar en preview
+
+                // Asegurar que los inputs estén deshabilitados para solo lectura
+                etOrigin.isEnabled = false
+                etDestination.isEnabled = false
             }
 
             fetchRoute(origin, dest)
@@ -1360,16 +1440,30 @@ private fun saveTripResult(tripResult: TripResult) {
 
     private fun exitPreview() {
         previewing = false
+        navigating = false
 
+        // Limpiar ruta
         clearRoute()
         routePoints = emptyList()
+        destinationLatLng = null
 
+        // Restaurar UI
         navigationBar.visibility = View.GONE
+        tripTopBarOrange.visibility = View.GONE
         tvEta.text = ""
         tvInstruction.text = ""
         tvStepDistance.text = ""
 
+        // Restaurar botones
         btnPreviewRoute.text = "Ver ruta"
+        btnCancelRoute.visibility = View.GONE
+
+        // Habilitar inputs
+        etOrigin.visibility = View.VISIBLE
+        etDestination.visibility = View.VISIBLE
+        btnRoute.visibility = View.VISIBLE
+        etOrigin.isEnabled = true
+        etDestination.isEnabled = true
 
         toast("Vista previa cancelada")
     }
@@ -1500,6 +1594,23 @@ private fun saveTripResult(tripResult: TripResult) {
             if (!navigating && !previewing) View.VISIBLE else View.GONE
     }
 
+
+    // =========================== YA VERÉ DONDEMETERLA============================
+    private fun calculateNextStepTime(distanceMeters: Int, currentSpeedKmh: Float): String {
+        if (currentSpeedKmh < 5) {
+            // Si vamos muy lento, asumir 5 km/h para cálculo
+            val timeMinutes = distanceMeters / (5000.0 / 60.0) // 5 km/h en m/min
+            return if (timeMinutes < 1) "${(timeMinutes * 60).toInt()} seg" else "${timeMinutes.toInt()} min"
+        }
+
+        val speedMps = currentSpeedKmh / 3.6
+        val timeSeconds = distanceMeters / speedMps
+
+        return when {
+            timeSeconds < 60 -> "${timeSeconds.toInt()} seg"
+            else -> "${(timeSeconds / 60).toInt()} min"
+        }
+    }
 
     private fun toast(msg: String) =
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
