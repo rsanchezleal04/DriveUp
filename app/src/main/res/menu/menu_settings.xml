@@ -5,4 +5,25 @@
         android:id="@+id/action_logout"
         android:title="Cerrar sesión" />
 
+    <item
+        android:id="@+id/action_dark_mode"
+        android:title="Tema oscuro / claro" />
+
+    <item
+        android:id="@+id/action_battery_saver"
+        android:title="Modo ahorro de batería" />
+
+    <item
+        android:id="@+id/action_background_tracking"
+        android:title="Seguimiento en segundo plano" />
+
+
+    <item
+        android:id="@+id/action_mute"
+        android:title="Mutear" />
+
+    <item
+        android:id="@+id/action_map_type"
+        android:title="Tipo de mapa" />
+
 </menu>

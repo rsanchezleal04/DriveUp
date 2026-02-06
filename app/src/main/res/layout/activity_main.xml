@@ -2,6 +2,7 @@
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -283,7 +284,7 @@
         android:layout_height="48dp"
         android:layout_marginStart="16dp"
         android:layout_marginTop="20dp"
-        android:background="@drawable/bg_circle_white"
+        android:background="?attr/colorOnSurface"
         android:src="@drawable/ic_menu"
         android:padding="10dp"
         android:elevation="8dp"
@@ -297,7 +298,7 @@
         android:layout_width="72dp"
         android:layout_height="72dp"
         android:layout_margin="16dp"
-        android:background="@drawable/bg_circle_white"
+        android:background="?attr/colorOnSurface"
         android:elevation="8dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent"
@@ -367,7 +368,7 @@
         android:layout_margin="14dp"
         android:orientation="vertical"
         android:padding="16dp"
-        android:background="@drawable/bg_white_with_orange_border"
+        android:background="?attr/colorOnSurface"
         android:elevation="12dp"
         app:layout_constraintBottom_toTopOf="@id/previewPanel"
         app:layout_constraintStart_toStartOf="parent"
@@ -400,7 +401,7 @@
                 android:layout_weight="1"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 app:boxStrokeColor="@color/driveup_orange"
-                app:hintTextColor="@android:color/black"
+                app:hintTextColor="@color/driveup_orange"
                 app:boxStrokeWidth="2dp"
                 app:boxCornerRadiusTopStart="8dp"
                 app:boxCornerRadiusTopEnd="8dp"
@@ -443,21 +444,24 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:boxBackgroundMode="outline"
                 app:boxStrokeColor="@color/driveup_orange"
-                app:hintTextColor="@android:color/black"
+                app:hintTextColor="@color/driveup_orange"
                 app:boxStrokeWidth="2dp"
                 app:boxCornerRadiusTopStart="8dp"
                 app:boxCornerRadiusTopEnd="8dp"
                 app:boxCornerRadiusBottomStart="8dp"
                 app:boxCornerRadiusBottomEnd="8dp">
 
+
                 <AutoCompleteTextView
                     android:id="@+id/etDestination"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:backgroundTint="@color/driveup_orange"
                     android:hint="Introduce destino"
-                    android:textColor="@android:color/black"
-                    android:backgroundTint="@color/driveup_orange"/>
+                    android:outlineProvider="background"
+                    android:textColor="@android:color/black" />
             </com.google.android.material.textfield.TextInputLayout>
         </LinearLayout>
 
@@ -547,7 +551,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:textSize="16sp"
-            android:textColor="@android:color/white"
+            android:textColor="?attr/colorOnBackground"
             android:gravity="center"/>
 
         <LinearLayout
@@ -562,7 +566,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textSize="14sp"
-                android:textColor="@android:color/white"
+                android:textColor="?attr/colorOnBackground"
                 android:textStyle="bold"
                 android:layout_marginEnd="16dp"/>
 
@@ -571,7 +575,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textSize="14sp"
-                android:textColor="@android:color/white"/>
+                android:textColor="?attr/colorOnBackground"/>
         </LinearLayout>
     </LinearLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

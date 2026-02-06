@@ -54,7 +54,7 @@ import com.example.driveup.navigation.SpeedLimitManager
 import com.google.firebase.firestore.FieldValue
 import android.view.ViewGroup
 import android.graphics.Color
-
+import androidx.appcompat.app.AppCompatDelegate
 
 
 data class NavigationStep(
@@ -1153,18 +1153,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
-    private fun updateMuteIcon() {
-        if (voiceEnabled) {
-            btnMute.setImageResource(android.R.drawable.ic_lock_silent_mode_off)
-            toast("Voz activada 🔊")
-        } else {
-            btnMute.setImageResource(android.R.drawable.ic_lock_silent_mode)
-            toast("Voz desactivada 🔇")
-        }
-    }
-
-
     private fun updateNavigationInstruction(loc: Location) {
         if (navigationSteps.isEmpty()) return
         if (currentStepIndex >= navigationSteps.size) return
@@ -1298,14 +1286,6 @@ class MainActivity : AppCompatActivity() {
                 ivTurnIcon.setImageResource(R.drawable.ic_arrive)
         }
     }
-//------------------------------LOGOUT------------------------------------
-    private fun logout() {
-        FirebaseAuth.getInstance().signOut()
-
-        val intent = Intent(this, LoginActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-    }
 
     private fun showSettingsMenu(anchor: View) {
         val popup = PopupMenu(this, anchor)
@@ -1313,6 +1293,29 @@ class MainActivity : AppCompatActivity() {
 
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
+
+                R.id.action_dark_mode -> {
+                    toggleDarkMode()
+                    true
+                }
+
+                R.id.action_battery_saver -> {
+                    toggleBatterySaver()
+                    true
+                }
+
+
+                R.id.action_map_type -> {
+                    showMapTypeDialog()
+                    true
+                }
+
+                R.id.btnMute -> {
+                    updateMuteIcon()
+                    true
+                }
+
+
 
                 R.id.action_logout -> {
                     confirmLogout()
@@ -1323,9 +1326,89 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-
         popup.show()
     }
+
+    /* -----------------------------
+       FUNCIONES DE AJUSTES
+       ----------------------------- */
+
+    private fun toggleDarkMode() {
+        val nightMode = AppCompatDelegate.getDefaultNightMode()
+        if (nightMode == AppCompatDelegate.MODE_NIGHT_YES) {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+        } else {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+        }
+    }
+
+    private fun toggleBatterySaver() {
+        // Aquí puedes reducir frecuencia de GPS, desactivar animaciones, etc.
+        Toast.makeText(this, "Modo ahorro de batería activado/desactivado", Toast.LENGTH_SHORT).show()
+    }
+
+
+    private fun showMapTypeDialog() {
+        val opciones = arrayOf("Normal", "Terreno", "Híbrido")
+
+        AlertDialog.Builder(this)
+            .setTitle("Tipo de mapa")
+            .setItems(opciones) { _, which ->
+                when (which) {
+                    0 -> setMapType("normal")
+                    1 -> setMapType("terrain")
+                    2 -> setMapType("hybrid")
+                }
+            }
+            .show()
+    }
+
+
+    private fun setMapType(type: String) {
+        val apiKey = "bfde33420b5842fea5085295622148e9"
+
+        val styleUrl = when (type) {
+            "normal" ->
+                "https://maps.geoapify.com/v1/styles/osm-bright/style.json?apiKey=$apiKey"
+
+            "satellite" ->
+                "https://maps.geoapify.com/v1/styles/satellite/style.json?apiKey=$apiKey"
+
+            "terrain" ->
+                "https://maps.geoapify.com/v1/styles/terrain/style.json?apiKey=$apiKey"
+
+            "hybrid" ->
+                "https://maps.geoapify.com/v1/styles/satellite-hybrid/style.json?apiKey=$apiKey"
+
+            else ->
+                "https://maps.geoapify.com/v1/styles/osm-bright/style.json?apiKey=$apiKey"
+        }
+
+        mapView.getMapAsync { map ->
+            map.setStyle(styleUrl)
+        }
+
+        Toast.makeText(this, "Mapa cambiado a: $type", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun updateMuteIcon() {
+        AlertDialog.Builder(this)
+            .setTitle("Mutear")
+        if (voiceEnabled) {
+            btnMute.setImageResource(android.R.drawable.ic_lock_silent_mode_off)
+            toast("Voz activada 🔊")
+        } else {
+            btnMute.setImageResource(android.R.drawable.ic_lock_silent_mode)
+            toast("Voz desactivada 🔇")
+        }
+    }
+
+
+    private fun logout() {
+        // Lógica real de cerrar sesión
+        Toast.makeText(this, "Sesión cerrada", Toast.LENGTH_SHORT).show()
+    }
+
 
     private fun confirmLogout() {
         AlertDialog.Builder(this)
