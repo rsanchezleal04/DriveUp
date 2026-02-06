@@ -1760,8 +1760,6 @@ private fun saveTripResult(tripResult: TripResult) {
     //================================ TIENDA =================================
     private fun updateStoreVisibility() {
         val shouldShow = !navigating && !previewing
-        findViewById<FrameLayout>(R.id.storeButtonContainer)?.visibility =
-            if (shouldShow) View.VISIBLE else View.GONE
         btnStore.visibility = if (shouldShow) View.VISIBLE else View.GONE
     }
 

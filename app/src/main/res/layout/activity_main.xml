@@ -293,26 +293,19 @@
         app:layout_constraintTop_toTopOf="parent"/>
 
     <!-- ================= BOTÓN TIENDA ================= -->
-    <FrameLayout
-        android:id="@+id/storeButtonContainer"
+    <ImageButton
+        android:id="@+id/btnStore"
         android:layout_width="72dp"
         android:layout_height="72dp"
         android:layout_margin="16dp"
-        android:background="?attr/colorOnSurface"
+        android:src="@drawable/ic_store_dup"
+        android:background="@android:color/transparent"
         android:elevation="8dp"
+        android:contentDescription="Tienda"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        android:layout_marginTop="16dp">
+        app:layout_constraintTop_toTopOf="parent"/>
 
-        <ImageButton
-            android:id="@+id/btnStore"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:layout_gravity="center"
-            android:background="@android:color/transparent"
-            android:src="@drawable/ic_store"
-            app:tint="@color/driveup_orange"/>
-    </FrameLayout>
+
 
     <!-- ================= VELOCÍMETRO ================= -->
     <FrameLayout
