@@ -28,8 +28,11 @@ class StoreAdapter(
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
+    /** Puntos actuales del usuario (los pone StoreActivity) para avisar antes de comprar. */
+    var userPoints: Int = 0
+
     // Color para productos comprados
-    private val purchasedColor = Color.parseColor("#73C2FB")
+    private val purchasedColor = Color.parseColor("#3D8BFD")
     // Color para productos no comprados: color definido en colors.xml
     private val normalColor = ContextCompat.getColor(context, R.color.driveup_orange)
 
@@ -56,7 +59,8 @@ class StoreAdapter(
         holder.tvName.text = item.name
         holder.tvDescription.text = item.description
         holder.btnBuy.text = if (item.purchased) "Ver código" else "Comprar"
-        holder.btnBuy.setBackgroundColor(
+        // backgroundTintList (no setBackgroundColor) para conservar las esquinas redondeadas
+        holder.btnBuy.backgroundTintList = android.content.res.ColorStateList.valueOf(
             if (item.purchased) purchasedColor else normalColor
         )
         holder.tvPrice.text = "${item.price} pts"
@@ -74,7 +78,7 @@ class StoreAdapter(
 
             if (item.purchased) {
                 val code = codesMap[item.name] ?: "No disponible"
-                android.app.AlertDialog.Builder(context)
+                com.google.android.material.dialog.MaterialAlertDialogBuilder(context)
                     .setTitle("Código de ${item.name}")
                     .setMessage("Tu código: $code")
                     .setPositiveButton("Aceptar", null)
@@ -82,7 +86,12 @@ class StoreAdapter(
                 return@setOnClickListener
             }
 
-            android.app.AlertDialog.Builder(context)
+            if (userPoints < item.price) {
+                showNotEnoughPoints(item, userPoints)
+                return@setOnClickListener
+            }
+
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(context)
                 .setTitle("Confirmar compra")
                 .setMessage("${item.description}\n\n¿Gastar ${item.price} pts?")
                 .setPositiveButton("Sí") { _, _ ->
@@ -91,7 +100,7 @@ class StoreAdapter(
                         val currentPoints = snapshot.getLong("points")?.toInt() ?: 0
 
                         if (currentPoints < item.price) {
-                            throw Exception("No tienes suficientes puntos")
+                            throw NotEnoughPointsException(currentPoints)
                         }
 
                         val newPoints = currentPoints - item.price
@@ -104,11 +113,21 @@ class StoreAdapter(
                         newPoints
                     }
                         .addOnSuccessListener {
+                            userPoints = it
                             notifyItemChanged(position)
                             onPointsUpdated(it)
                         }
                         .addOnFailureListener { e ->
-                            Toast.makeText(context, e.message, Toast.LENGTH_SHORT).show()
+                            // Firestore envuelve la excepción: buscar la nuestra en la causa
+                            var cause: Throwable? = e
+                            while (cause != null && cause !is NotEnoughPointsException) cause = cause.cause
+                            if (cause is NotEnoughPointsException) {
+                                userPoints = cause.currentPoints
+                                onPointsUpdated(cause.currentPoints)
+                                showNotEnoughPoints(item, cause.currentPoints)
+                            } else {
+                                Toast.makeText(context, "No se pudo completar la compra", Toast.LENGTH_SHORT).show()
+                            }
                         }
                 }
                 .setNegativeButton("No", null)
@@ -116,6 +135,30 @@ class StoreAdapter(
         }
     }
 
+
+    private class NotEnoughPointsException(val currentPoints: Int) : Exception("No tienes suficientes puntos")
+
+    /** Ventana bonita de "te faltan X puntos" con barra de progreso. */
+    private fun showNotEnoughPoints(item: StoreItem, have: Int) {
+        val view = LayoutInflater.from(context).inflate(R.layout.dialog_not_enough_points, null)
+        val fmt = java.text.NumberFormat.getIntegerInstance(java.util.Locale("es", "ES"))
+        val missing = (item.price - have).coerceAtLeast(0)
+
+        view.findViewById<TextView>(R.id.tvNepMessage).text =
+            "Te faltan ${fmt.format(missing)} pts para\n${item.name}"
+        view.findViewById<TextView>(R.id.tvNepHave).text = "Tienes ${fmt.format(have)} pts"
+        view.findViewById<TextView>(R.id.tvNepNeed).text = "${fmt.format(item.price)} pts"
+
+        val percent = if (item.price > 0) (have * 100L / item.price).toInt().coerceIn(0, 100) else 100
+        view.findViewById<com.google.android.material.progressindicator.LinearProgressIndicator>(R.id.progressNep)
+            .setProgressCompat(maxOf(percent, 2), true)   // un poquito siempre visible
+
+        val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(context)
+            .setView(view)
+            .create()
+        view.findViewById<Button>(R.id.btnNepOk).setOnClickListener { dialog.dismiss() }
+        dialog.show()
+    }
 
     /** Permite a la Activity cambiar la lista (orden / filtro) */
     fun updateItems(newItems: List<StoreItem>) {

@@ -4,21 +4,23 @@ import android.os.Bundle
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-//import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.example.driveup.Models.User
+import com.example.driveup.models.User
 import com.example.driveup.store.StoreAdapter
 import com.example.driveup.store.StoreItem
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
 class StoreActivity : AppCompatActivity() {
 
     private lateinit var tvPoints: TextView
+    private lateinit var tvEmpty: TextView
     private lateinit var recyclerView: RecyclerView
-    private lateinit var spinnerCategory: Spinner
-    private lateinit var btnBack: Button
+    private lateinit var chipCategories: ChipGroup
+    private lateinit var btnBack: View
 
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseFirestore.getInstance()
@@ -29,6 +31,8 @@ class StoreActivity : AppCompatActivity() {
     private lateinit var adapter: StoreAdapter
 
     private val allItems = mutableListOf<StoreItem>()
+    private var sortedItems: List<StoreItem> = emptyList()
+    private var selectedCategory = "Todas"
 
     // ===== CATEGORÍAS FILTRO =====
     private val filterCategories = listOf(
@@ -45,8 +49,9 @@ class StoreActivity : AppCompatActivity() {
         setContentView(R.layout.activity_store)
 
         tvPoints = findViewById(R.id.tvPointsValue)
+        tvEmpty = findViewById(R.id.tvStoreEmpty)
         recyclerView = findViewById(R.id.storeRecyclerView)
-        spinnerCategory = findViewById(R.id.spinnerCategory)
+        chipCategories = findViewById(R.id.chipCategories)
         btnBack = findViewById(R.id.btnBack)
 
         btnBack.setOnClickListener { finish() }
@@ -58,13 +63,25 @@ class StoreActivity : AppCompatActivity() {
         }
         recyclerView.adapter = adapter
 
-        spinnerCategory.adapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_spinner_dropdown_item,
-            filterCategories
-        )
-
+        setupCategoryChips()
         loadUserData()
+    }
+
+    private fun setupCategoryChips() {
+        filterCategories.forEachIndexed { index, name ->
+            // Inflar desde XML para que el estilo deje la pestaña pulsable y marcable
+            val chip = layoutInflater.inflate(R.layout.item_category_chip, chipCategories, false) as Chip
+            chip.id = View.generateViewId()
+            chip.text = name
+            chipCategories.addView(chip)
+            if (index == 0) chipCategories.check(chip.id)
+        }
+
+        chipCategories.setOnCheckedStateChangeListener { group, checkedIds ->
+            val chip = checkedIds.firstOrNull()?.let { group.findViewById<Chip>(it) } ?: return@setOnCheckedStateChangeListener
+            selectedCategory = chip.text.toString()
+            applyFilter()
+        }
     }
 
     private fun loadUserData() {
@@ -74,6 +91,7 @@ class StoreActivity : AppCompatActivity() {
             val user = snapshot.toObject(User::class.java)
 
             userPoints = user?.points ?: 0
+            adapter.userPoints = userPoints
             tvPoints.text = "$userPoints pts"
 
             userCodes.clear()
@@ -103,31 +121,18 @@ class StoreActivity : AppCompatActivity() {
 
                 val prioritySorted = allItems.sortedByDescending { it.priority }
 
-                val finalSorted = prioritySorted.sortedByDescending {
+                sortedItems = prioritySorted.sortedByDescending {
                     userCategories[it.category] ?: 0
                 }
 
-                adapter.updateItems(finalSorted)
-
-                applySpinnerFilter(finalSorted)
+                applyFilter()
             }
     }
 
-    private fun applySpinnerFilter(sortedItems: List<StoreItem>) {
-        spinnerCategory.onItemSelectedListener =
-            object : AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(
-                    parent: AdapterView<*>, view: View?, position: Int, id: Long
-                ) {
-                    val selected = filterCategories[position]
-                    if (selected == "Todas") {
-                        adapter.updateItems(sortedItems)
-                    } else {
-                        adapter.updateItems(sortedItems.filter { it.category == selected })
-                    }
-                }
-
-                override fun onNothingSelected(parent: AdapterView<*>) {}
-            }
+    private fun applyFilter() {
+        val items = if (selectedCategory == "Todas") sortedItems
+                    else sortedItems.filter { it.category == selectedCategory }
+        adapter.updateItems(items)
+        tvEmpty.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
     }
 }

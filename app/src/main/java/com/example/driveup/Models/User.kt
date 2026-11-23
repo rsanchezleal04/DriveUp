@@ -1,4 +1,4 @@
-package com.example.driveup.Models
+package com.example.driveup.models
 
 data class User(
     val uid: String = "",

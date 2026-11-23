@@ -26,4 +26,8 @@
         android:id="@+id/action_map_type"
         android:title="Tipo de mapa" />
 
+    <item
+        android:id="@+id/action_saved_places"
+        android:title="Editar casa y trabajo" />
+
 </menu>

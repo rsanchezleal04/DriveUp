@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Colores de plantilla (se mantienen por compatibilidad) -->
     <color name="purple_200">#FFBB86FC</color>
     <color name="purple_500">#FF6200EE</color>
     <color name="purple_700">#FF3700B3</color>
@@ -7,5 +8,17 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="driveup_orange">#FF9800</color>
+
+    <!-- Marca -->
+    <color name="driveup_orange">#FFFF8A00</color>
+    <color name="driveup_orange_dark">#FFE06F00</color>
+
+    <!-- Superficies (modo claro; values-night redefine los mismos nombres) -->
+    <color name="du_background">#FFF5F5F7</color>
+    <color name="du_surface">#FFFFFFFF</color>
+    <color name="du_surface_variant">#FFF1F1F4</color>
+    <color name="du_on_surface">#FF1C1C1E</color>
+    <color name="du_on_surface_variant">#FF6E6E73</color>
+    <color name="du_outline">#FFE3E3E8</color>
+    <color name="du_scrim">#33000000</color>
 </resources>

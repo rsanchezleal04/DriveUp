@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Botón redondo flotante (menú) que sigue el tema -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#33FF8A00">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@color/du_surface" />
+        </shape>
+    </item>
+</ripple>

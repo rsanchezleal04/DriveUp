@@ -128,6 +128,18 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnClosePreview: Button
     private lateinit var routeInputContainer: LinearLayout
     private lateinit var cancelButtonContainer: LinearLayout
+    private lateinit var tvPreviewRoute: TextView
+    private lateinit var tvPreviewAlt: TextView
+    private lateinit var btnGoHome: Button
+    private lateinit var btnGoWork: Button
+
+    private companion object {
+        const val SRC_ALT = "route-alt"
+        const val LAYER_ALT = "route-alt-layer"
+        const val LAYER_CASING = "route-casing-layer"
+        const val SRC_ENDPOINTS = "route-endpoints"
+        const val LAYER_ENDPOINTS = "route-endpoints-layer"
+    }
 
 
 
@@ -174,6 +186,8 @@ class MainActivity : AppCompatActivity() {
         btnClosePreview = findViewById(R.id.btnClosePreview)
         routeInputContainer = findViewById(R.id.routeInputContainer)
         cancelButtonContainer = findViewById(R.id.cancelButtonContainer)
+        tvPreviewRoute = findViewById(R.id.tvPreviewRoute)
+        tvPreviewAlt = findViewById(R.id.tvPreviewAlt)
 
         fusedLocation = LocationServices.getFusedLocationProviderClient(this)
 
@@ -182,7 +196,10 @@ class MainActivity : AppCompatActivity() {
         mapView.getMapAsync {
             map = it
             map.setStyle(
-                Style.Builder().fromUri("https://tiles.openfreemap.org/styles/liberty")
+                Style.Builder().fromUri(
+                    if (ThemePrefs.isNight(this)) "https://tiles.openfreemap.org/styles/dark"
+                    else "https://tiles.openfreemap.org/styles/liberty"
+                )
             ) {
                 mapReady = true
                 checkPermission()
@@ -248,6 +265,15 @@ class MainActivity : AppCompatActivity() {
             showSettingsMenu(it)
         }
 
+        // ================= CASA / TRABAJO =================
+        btnGoHome = findViewById(R.id.btnGoHome)
+        btnGoWork = findViewById(R.id.btnGoWork)
+        btnGoHome.setOnClickListener { goToSavedPlace(SavedPlaces.Place.HOME) }
+        btnGoWork.setOnClickListener { goToSavedPlace(SavedPlaces.Place.WORK) }
+        btnGoHome.setOnLongClickListener { editSavedPlace(SavedPlaces.Place.HOME); true }
+        btnGoWork.setOnLongClickListener { editSavedPlace(SavedPlaces.Place.WORK); true }
+        updateSavedPlaceButtons()
+
 
         // ================= TTS =================
         tts = TextToSpeech(this) {
@@ -279,8 +305,10 @@ class MainActivity : AppCompatActivity() {
         previewPanel.visibility = View.GONE
 
         // Cambiar a modo navegación (esto recalculará la ruta desde ubicación actual)
+        clearRoute()
         previewing = false
         navigating = true
+        followUser = true
 
         // Iniciar navegación desde ubicación actual
         val originLatLng = LatLng(currentLoc.latitude, currentLoc.longitude)
@@ -470,7 +498,7 @@ class MainActivity : AppCompatActivity() {
 
     //====================== TRACKING=============================
     private fun updateCameraFollowingCar(loc: Location) {
-        if (!followUser) return
+        if (!followUser || previewing) return
         if (!mapReady) return
 
         // Bearing solo si velocidad ≥ 2 km/h (≈ 0.55 m/s)
@@ -528,14 +556,159 @@ class MainActivity : AppCompatActivity() {
         val url =
             "https://router.project-osrm.org/route/v1/driving/" +
                     "${o.longitude},${o.latitude};${d.longitude},${d.latitude}" +
-                    "?overview=full&geometries=geojson&steps=true"
+                    "?overview=full&geometries=geojson&steps=true" +
+                    (if (previewing) "&alternatives=true" else "")
 
 
-        val res = client.newCall(Request.Builder().url(url).build())
-            .execute().body?.string() ?: return
+        val res = try {
+            client.newCall(Request.Builder().url(url).build())
+                .execute().body?.string()
+        } catch (_: Exception) { null }
 
-        runOnUiThread { drawRoute(res) }
+        if (res == null) {
+            runOnUiThread { toast("No se pudo calcular la ruta") }
+            return
+        }
+
+        runOnUiThread {
+            if (previewing) drawPreview(res, o, d) else drawRoute(res)
+        }
     }
+
+    // ================= VISTA PREVIA: RUTA COMPLETA + ALTERNATIVAS =================
+    private fun drawPreview(json: String, origin: LatLng, dest: LatLng) {
+        if (!mapReady || !previewing) return
+
+        val routes = JSONObject(json).optJSONArray("routes")
+        if (routes == null || routes.length() == 0) {
+            toast("No se encontró ninguna ruta")
+            return
+        }
+
+        fun lineOf(route: JSONObject): List<Point> {
+            val coords = route.getJSONObject("geometry").getJSONArray("coordinates")
+            return (0 until coords.length()).map {
+                val c = coords.getJSONArray(it)
+                Point.fromLngLat(c.getDouble(0), c.getDouble(1))
+            }
+        }
+
+        val main = routes.getJSONObject(0)
+        val mainLine = lineOf(main)
+        val altLines = (1 until routes.length()).map { lineOf(routes.getJSONObject(it)) }
+
+        routePoints = mainLine.map { LatLng(it.latitude(), it.longitude()) }
+
+        val endpoints = org.maplibre.geojson.FeatureCollection.fromFeatures(
+            listOf(
+                org.maplibre.geojson.Feature.fromGeometry(
+                    Point.fromLngLat(origin.longitude, origin.latitude)
+                ).apply { addStringProperty("kind", "origin") },
+                org.maplibre.geojson.Feature.fromGeometry(
+                    Point.fromLngLat(dest.longitude, dest.latitude)
+                ).apply { addStringProperty("kind", "dest") }
+            )
+        )
+        val alts = org.maplibre.geojson.FeatureCollection.fromFeatures(
+            altLines.map { org.maplibre.geojson.Feature.fromGeometry(LineString.fromLngLats(it)) }
+        )
+
+        clearRoute()
+        map.getStyle { style ->
+            style.addSource(GeoJsonSource(SRC_ALT, alts))
+            style.addLayer(
+                LineLayer(LAYER_ALT, SRC_ALT).withProperties(
+                    lineColor("#9AA0A6"),
+                    lineWidth(6f),
+                    lineOpacity(0.8f),
+                    lineCap(org.maplibre.android.style.layers.Property.LINE_CAP_ROUND),
+                    lineJoin(org.maplibre.android.style.layers.Property.LINE_JOIN_ROUND)
+                )
+            )
+
+            style.addSource(GeoJsonSource("route", LineString.fromLngLats(mainLine)))
+            style.addLayer(
+                LineLayer(LAYER_CASING, "route").withProperties(
+                    lineColor("#B35600"),
+                    lineWidth(10f),
+                    lineCap(org.maplibre.android.style.layers.Property.LINE_CAP_ROUND),
+                    lineJoin(org.maplibre.android.style.layers.Property.LINE_JOIN_ROUND)
+                )
+            )
+            style.addLayer(
+                LineLayer("route-layer", "route").withProperties(
+                    lineColor("#FF8A00"),
+                    lineWidth(6.5f),
+                    lineCap(org.maplibre.android.style.layers.Property.LINE_CAP_ROUND),
+                    lineJoin(org.maplibre.android.style.layers.Property.LINE_JOIN_ROUND)
+                )
+            )
+
+            style.addSource(GeoJsonSource(SRC_ENDPOINTS, endpoints))
+            style.addLayer(
+                org.maplibre.android.style.layers.CircleLayer(LAYER_ENDPOINTS, SRC_ENDPOINTS)
+                    .withProperties(
+                        circleRadius(8f),
+                        circleColor(
+                            org.maplibre.android.style.expressions.Expression.match(
+                                org.maplibre.android.style.expressions.Expression.get("kind"),
+                                org.maplibre.android.style.expressions.Expression.literal("#FFFFFF"),
+                                org.maplibre.android.style.expressions.Expression.stop("dest", "#E53935")
+                            )
+                        ),
+                        circleStrokeColor("#FF8A00"),
+                        circleStrokeWidth(4f)
+                    )
+            )
+        }
+
+        // Textos del panel
+        val distanceKm = main.getDouble("distance") / 1000
+        val durationMin = main.getDouble("duration") / 60
+        tvPreviewTime.text = formatTimeForPreview(durationMin)
+        tvPreviewDistance.text = "%.1f km".format(distanceKm)
+
+        val originName = etOrigin.text.toString().trim().ifEmpty { "Tu ubicación" }
+        val destName = etDestination.text.toString().trim()
+        tvPreviewRoute.text = "${shortPlace(originName)}  →  ${shortPlace(destName)}"
+
+        if (routes.length() > 1) {
+            val alt = routes.getJSONObject(1)
+            val diff = ((alt.getDouble("duration") - main.getDouble("duration")) / 60).roundToInt()
+            tvPreviewAlt.text = "Alternativa en gris: ${formatTimeForPreview(alt.getDouble("duration") / 60)} " +
+                    "(${if (diff >= 0) "+" else ""}$diff min) · %.1f km".format(alt.getDouble("distance") / 1000)
+            tvPreviewAlt.visibility = View.VISIBLE
+        } else {
+            tvPreviewAlt.visibility = View.GONE
+        }
+
+        previewPanel.visibility = View.VISIBLE
+        navigationBar.visibility = View.GONE
+        tripTopBarOrange.visibility = View.GONE
+        routeInputContainer.visibility = View.GONE
+        updateStoreVisibility()
+
+        // Encuadrar toda la ruta (y alternativas) por encima del panel
+        followUser = false
+        map.locationComponent.cameraMode = CameraMode.NONE
+        val bounds = org.maplibre.android.geometry.LatLngBounds.Builder().apply {
+            (mainLine + altLines.flatten()).forEach { include(LatLng(it.latitude(), it.longitude())) }
+            include(origin); include(dest)
+        }.build()
+
+        previewPanel.post {
+            val pad = (resources.displayMetrics.density * 48).toInt()
+            val bottom = previewPanel.height + pad + (resources.displayMetrics.density * 24).toInt()
+            map.animateCamera(
+                CameraUpdateFactory.newLatLngBounds(bounds, 0.0, 0.0, pad, pad * 2, pad, bottom),
+                1000
+            )
+        }
+    }
+
+    /** "Calle Mayor, 28320 Pinto, Madrid, España" -> "Calle Mayor" */
+    private fun shortPlace(text: String): String =
+        text.substringBefore(",").trim().replaceFirstChar { it.uppercase() }
 
     private fun onNavigationStarted() {
         navigating = true
@@ -1033,13 +1206,117 @@ class MainActivity : AppCompatActivity() {
         tvSpeed.text = "0"
     }
 
+    // ================= CASA / TRABAJO =================
+
+    /** Muestra la ruta desde tu ubicación hasta Casa/Trabajo; si no está guardada, la pide. */
+    private fun goToSavedPlace(place: SavedPlaces.Place) {
+        val address = SavedPlaces.get(this, place)
+        if (address == null) {
+            editSavedPlace(place, openRouteAfterSave = true)
+            return
+        }
+        if (navigating) {
+            toast("Termina o cancela el viaje actual primero")
+            return
+        }
+
+        // Quitar el foco antes de escribir para que no salten las sugerencias
+        etOrigin.clearFocus()
+        etDestination.clearFocus()
+        etOrigin.setText("")                // desde tu ubicación actual
+        etDestination.setText(address)
+        etDestination.dismissDropDown()
+        hideKeyboard()
+
+        previewRoute()
+    }
+
+    private fun editSavedPlace(place: SavedPlaces.Place, openRouteAfterSave: Boolean = false) {
+        val density = resources.displayMetrics.density
+        val input = EditText(this).apply {
+            hint = "Calle, número y ciudad"
+            setText(SavedPlaces.get(this@MainActivity, place) ?: "")
+            setSelection(text.length)
+            setSingleLine()
+        }
+        val container = FrameLayout(this).apply {
+            setPadding((20 * density).toInt(), (8 * density).toInt(), (20 * density).toInt(), 0)
+            addView(input)
+        }
+
+        val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle(if (place == SavedPlaces.Place.HOME) "Dirección de casa" else "Dirección del trabajo")
+            .setView(container)
+            .setPositiveButton("Guardar", null)
+            .setNegativeButton("Cancelar", null)
+            .apply {
+                if (SavedPlaces.get(this@MainActivity, place) != null) {
+                    setNeutralButton("Borrar") { _, _ ->
+                        SavedPlaces.set(this@MainActivity, place, null)
+                        updateSavedPlaceButtons()
+                        toast("${place.label} borrada")
+                    }
+                }
+            }
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val text = input.text.toString().trim()
+                if (text.isEmpty()) {
+                    input.error = "Escribe una dirección"
+                    return@setOnClickListener
+                }
+                // Comprobar que la dirección existe antes de guardarla
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val found = try { geocode(text) } catch (_: Exception) { null }
+                    withContext(Dispatchers.Main) {
+                        if (found == null) {
+                            input.error = "No encuentro esa dirección"
+                        } else {
+                            SavedPlaces.set(this@MainActivity, place, text)
+                            updateSavedPlaceButtons()
+                            dialog.dismiss()
+                            toast("${place.label} guardada")
+                            if (openRouteAfterSave) goToSavedPlace(place)
+                        }
+                    }
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun showSavedPlacesMenu() {
+        val home = SavedPlaces.get(this, SavedPlaces.Place.HOME) ?: "Sin guardar"
+        val work = SavedPlaces.get(this, SavedPlaces.Place.WORK) ?: "Sin guardar"
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("Casa y trabajo")
+            .setItems(arrayOf("🏠  Casa · $home", "💼  Trabajo · $work")) { _, which ->
+                editSavedPlace(if (which == 0) SavedPlaces.Place.HOME else SavedPlaces.Place.WORK)
+            }
+            .show()
+    }
+
+    private fun updateSavedPlaceButtons() {
+        fun label(place: SavedPlaces.Place) =
+            if (SavedPlaces.get(this, place) == null) "Añadir ${place.label.lowercase()}" else place.label
+        btnGoHome.text = label(SavedPlaces.Place.HOME)
+        btnGoWork.text = label(SavedPlaces.Place.WORK)
+    }
+
+    private fun hideKeyboard() {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(window.decorView.windowToken, 0)
+    }
+
     private fun clearRoute() {
         map.getStyle { style ->
-            if (style.getLayer("route-layer") != null) {
-                style.removeLayer("route-layer")
+            listOf("route-layer", LAYER_CASING, LAYER_ALT, LAYER_ENDPOINTS).forEach {
+                if (style.getLayer(it) != null) style.removeLayer(it)
             }
-            if (style.getSource("route") != null) {
-                style.removeSource("route")
+            listOf("route", SRC_ALT, SRC_ENDPOINTS).forEach {
+                if (style.getSource(it) != null) style.removeSource(it)
             }
         }
 
@@ -1310,7 +1587,8 @@ class MainActivity : AppCompatActivity() {
                     true
                 }
 
-                R.id.btnMute -> {
+                R.id.action_mute -> {
+                    voiceEnabled = !voiceEnabled
                     updateMuteIcon()
                     true
                 }
@@ -1319,6 +1597,11 @@ class MainActivity : AppCompatActivity() {
 
                 R.id.action_logout -> {
                     confirmLogout()
+                    true
+                }
+
+                R.id.action_saved_places -> {
+                    showSavedPlacesMenu()
                     true
                 }
 
@@ -1334,12 +1617,7 @@ class MainActivity : AppCompatActivity() {
        ----------------------------- */
 
     private fun toggleDarkMode() {
-        val nightMode = AppCompatDelegate.getDefaultNightMode()
-        if (nightMode == AppCompatDelegate.MODE_NIGHT_YES) {
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-        } else {
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-        }
+        ThemePrefs.toggle(this)
     }
 
     private fun toggleBatterySaver() {
@@ -1605,6 +1883,10 @@ private fun saveTripResult(tripResult: TripResult) {
             // Limpiar texto (solo tiempo y distancia, no calles)
             tvPreviewTime.text = ""
             tvPreviewDistance.text = ""
+            tvPreviewAlt.visibility = View.GONE
+
+            // Volver a seguir al usuario
+            centerToUserLocation()
         }
 
         toast("Vista previa cancelada")
@@ -1681,16 +1963,16 @@ private fun saveTripResult(tripResult: TripResult) {
                                 override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                                     val view = super.getView(position, convertView, parent)
                                     val textView = view.findViewById<TextView>(android.R.id.text1)
-                                    textView.setTextColor(Color.BLACK)  // Texto negro
-                                    textView.setBackgroundColor(Color.WHITE)  // Fondo blanco
+                                    textView.setTextColor(ContextCompat.getColor(context, R.color.du_on_surface))
+                                    textView.setBackgroundColor(Color.TRANSPARENT)
                                     return view
                                 }
 
                                 override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
                                     val view = super.getDropDownView(position, convertView, parent)
                                     val textView = view.findViewById<TextView>(android.R.id.text1)
-                                    textView.setTextColor(Color.BLACK)  // Texto negro en dropdown
-                                    textView.setBackgroundColor(Color.WHITE)  // Fondo blanco en dropdown
+                                    textView.setTextColor(ContextCompat.getColor(context, R.color.du_on_surface))
+                                    textView.setBackgroundColor(Color.TRANSPARENT)
                                     return view
                                 }
                             }

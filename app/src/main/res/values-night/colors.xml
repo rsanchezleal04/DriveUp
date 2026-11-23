@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Superficies en modo oscuro -->
+    <color name="du_background">#FF121316</color>
+    <color name="du_surface">#FF1E1F24</color>
+    <color name="du_surface_variant">#FF2A2B31</color>
+    <color name="du_on_surface">#FFF2F2F5</color>
+    <color name="du_on_surface_variant">#FFA1A1AA</color>
+    <color name="du_outline">#FF3A3B42</color>
+    <color name="du_scrim">#66000000</color>
+</resources>

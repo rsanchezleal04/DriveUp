@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.driveup">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- 🌐 Internet -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -14,6 +13,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
     <application
+        android:name=".DriveUpApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -26,6 +26,7 @@
         <!-- 🟢 LOGIN (LAUNCHER) -->
         <activity
             android:name=".LoginActivity"
+            android:theme="@style/Theme.DriveUp.Dark"
             android:exported="true"
             android:screenOrientation="portrait"
             android:configChanges="orientation|screenSize">
@@ -53,6 +54,7 @@
         <!-- VERIFY EMAI -->
         <activity
             android:name=".VerifyEmailActivity"
+            android:theme="@style/Theme.DriveUp.Dark"
             android:exported="false"
             android:screenOrientation="portrait"
             android:configChanges="orientation|screenSize" />
@@ -60,6 +62,7 @@
         <!-- STORE -->
         <activity
             android:name=".StoreActivity"
+            android:theme="@style/Theme.DriveUp.Store"
             android:exported="false"
             android:screenOrientation="portrait" />
 

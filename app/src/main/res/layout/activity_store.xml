@@ -4,77 +4,151 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorOnSurface">
+    android:background="?android:attr/colorBackground">
 
-    <!-- TÍTULO -->
-    <TextView
-        android:id="@+id/tvStoreTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Tienda DriveUP"
-        android:textColor="@android:color/holo_orange_dark"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:layout_margin="16dp"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"/>
-
-    <!-- SUBTÍTULO -->
-    <TextView
-        android:id="@+id/tvStoreSubtitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Canjea tus puntos por recompensas"
-        android:textColor="@android:color/holo_orange_dark"
-        android:textSize="14sp"
-        android:layout_marginTop="4dp"
-        app:layout_constraintTop_toBottomOf="@id/tvStoreTitle"
-        app:layout_constraintStart_toStartOf="@id/tvStoreTitle"/>
-
-    <!-- PUNTOS -->
-    <TextView
-        android:id="@+id/tvPointsValue"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="0 pts"
-        android:textColor="@color/driveup_orange"
-        android:textSize="16sp"
-        android:textStyle="bold"
-        android:layout_margin="16dp"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
-
-    <!-- FILTRO CATEGORÍA -->
-    <Spinner
-        android:id="@+id/spinnerCategory"
+    <!-- ================= CABECERA ================= -->
+    <LinearLayout
+        android:id="@+id/storeHeader"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        android:backgroundTint="@color/driveup_orange"
-        app:layout_constraintTop_toBottomOf="@id/tvStoreSubtitle"
+        android:background="@drawable/bg_store_header"
+        android:orientation="vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="24dp"
+        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
+        app:layout_constraintEnd_toEndOf="parent">
 
-    <!-- LISTA TIENDA -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/btnBack"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginStart="-10dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Volver"
+                android:src="@drawable/ic_arrow_back" />
+
+            <TextView
+                android:id="@+id/tvStoreTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="Tienda DriveUp"
+                android:textColor="@android:color/white"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvStoreSubtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Conduce bien, suma puntos y canjéalos por recompensas"
+            android:textColor="#E6FFFFFF"
+            android:textSize="14sp" />
+
+        <!-- Saldo de puntos -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:background="@drawable/bg_points_card"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="16dp">
+
+            <ImageView
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_points_card"
+                android:padding="8dp"
+                android:src="@drawable/ic_star_points"
+                android:contentDescription="@null" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="14dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Tus puntos"
+                    android:textColor="#E6FFFFFF"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/tvPointsValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0 pts"
+                    android:textColor="@android:color/white"
+                    android:textSize="28sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ================= CATEGORÍAS ================= -->
+    <HorizontalScrollView
+        android:id="@+id/categoryScroll"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:clipToPadding="false"
+        android:paddingHorizontal="12dp"
+        android:scrollbars="none"
+        app:layout_constraintTop_toBottomOf="@id/storeHeader"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chipCategories"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:chipSpacingHorizontal="8dp"
+            app:selectionRequired="true"
+            app:singleLine="true"
+            app:singleSelection="true" />
+    </HorizontalScrollView>
+
+    <!-- ================= LISTA ================= -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/storeRecyclerView"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginTop="8dp"
-        app:layout_constraintTop_toBottomOf="@id/spinnerCategory"
-        app:layout_constraintBottom_toTopOf="@id/btnBack"
+        android:layout_marginTop="4dp"
+        android:clipToPadding="false"
+        android:paddingHorizontal="10dp"
+        android:paddingBottom="16dp"
+        app:layout_constraintTop_toBottomOf="@id/categoryScroll"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>
 
-    <!-- BOTÓN VOLVER -->
-    <Button
-        android:id="@+id/btnBack"
-        android:layout_width="match_parent"
+    <!-- Vacío -->
+    <TextView
+        android:id="@+id/tvStoreEmpty"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Volver"
-        android:backgroundTint="@color/driveup_orange"
-        android:textColor="@android:color/white"
-        android:layout_margin="16dp"
-        app:layout_constraintBottom_toBottomOf="parent"/>
+        android:text="No hay recompensas en esta categoría"
+        android:textColor="@color/du_on_surface_variant"
+        android:textSize="14sp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/categoryScroll"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
