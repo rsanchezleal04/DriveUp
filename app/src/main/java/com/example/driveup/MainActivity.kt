@@ -195,12 +195,7 @@ class MainActivity : AppCompatActivity() {
         mapView.onCreate(savedInstanceState)
         mapView.getMapAsync {
             map = it
-            map.setStyle(
-                Style.Builder().fromUri(
-                    if (ThemePrefs.isNight(this)) "https://tiles.openfreemap.org/styles/dark"
-                    else "https://tiles.openfreemap.org/styles/liberty"
-                )
-            ) {
+            map.setStyle(MapStyles.builder(this, MapStyles.saved(this))) {
                 mapReady = true
                 checkPermission()
 
@@ -344,24 +339,34 @@ class MainActivity : AppCompatActivity() {
         ) return
 
         map.getStyle { style ->
-            val options = LocationComponentOptions.builder(this)
-                .pulseEnabled(true)
-                .build()
-
-            val activationOptions =
-                LocationComponentActivationOptions.builder(this, style)
-                    .locationComponentOptions(options)
-                    .useDefaultLocationEngine(true)
-                    .build()
-
-            val lc = map.locationComponent
-            lc.activateLocationComponent(activationOptions)
-            lc.isLocationComponentEnabled = true
-            lc.cameraMode = CameraMode.NONE
-            lc.renderMode = RenderMode.COMPASS
-
+            activateLocationPuck(style)
             startLocationUpdates()
         }
+    }
+
+    /** Pinta el punto de "mi ubicación" en el estilo actual (también tras cambiar de mapa). */
+    @android.annotation.SuppressLint("MissingPermission")
+    private fun activateLocationPuck(style: Style) {
+        if (ContextCompat.checkSelfPermission(
+                this, Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) return
+
+        val options = LocationComponentOptions.builder(this)
+            .pulseEnabled(true)
+            .build()
+
+        val activationOptions =
+            LocationComponentActivationOptions.builder(this, style)
+                .locationComponentOptions(options)
+                .useDefaultLocationEngine(true)
+                .build()
+
+        val lc = map.locationComponent
+        lc.activateLocationComponent(activationOptions)
+        lc.isLocationComponentEnabled = true
+        lc.cameraMode = CameraMode.NONE
+        lc.renderMode = RenderMode.COMPASS
     }
 
     // ================= UBICACIÓN =================
@@ -1565,51 +1570,47 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showSettingsMenu(anchor: View) {
-        val popup = PopupMenu(this, anchor)
-        popup.menuInflater.inflate(R.menu.menu_settings, popup.menu)
-
-        popup.setOnMenuItemClickListener { item ->
-            when (item.itemId) {
-
-                R.id.action_dark_mode -> {
-                    toggleDarkMode()
-                    true
-                }
-
-                R.id.action_battery_saver -> {
-                    toggleBatterySaver()
-                    true
-                }
-
-
-                R.id.action_map_type -> {
-                    showMapTypeDialog()
-                    true
-                }
-
-                R.id.action_mute -> {
-                    voiceEnabled = !voiceEnabled
-                    updateMuteIcon()
-                    true
-                }
-
-
-
-                R.id.action_logout -> {
-                    confirmLogout()
-                    true
-                }
-
-                R.id.action_saved_places -> {
-                    showSavedPlacesMenu()
-                    true
-                }
-
-                else -> false
-            }
+        val view = layoutInflater.inflate(R.layout.popup_settings, null)
+        val popup = PopupWindow(
+            view,
+            (resources.displayMetrics.density * 280).toInt(),   // ancho fijo (el del XML se pierde al inflar sin padre)
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            true
+        ).apply {
+            elevation = 16f
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            animationStyle = android.R.style.Animation_Dialog
         }
 
-        popup.show()
+        view.findViewById<TextView>(R.id.tvMapTypeValue).text = MapStyles.saved(this).label
+
+        val switchDark = view.findViewById<CompoundButton>(R.id.switchDarkMode)
+        switchDark.isChecked = ThemePrefs.isNight(this)
+        val switchMute = view.findViewById<CompoundButton>(R.id.switchMute)
+        switchMute.isChecked = !voiceEnabled
+
+        view.findViewById<View>(R.id.rowMapType).setOnClickListener {
+            popup.dismiss(); showMapTypeDialog()
+        }
+        view.findViewById<View>(R.id.rowDarkMode).setOnClickListener {
+            switchDark.isChecked = !switchDark.isChecked
+            // Dejar ver la animación del interruptor antes de recrear la pantalla
+            view.postDelayed({ popup.dismiss(); toggleDarkMode() }, 220)
+        }
+        view.findViewById<View>(R.id.rowMute).setOnClickListener {
+            voiceEnabled = !voiceEnabled
+            switchMute.isChecked = !voiceEnabled
+            updateMuteIcon()
+        }
+        view.findViewById<View>(R.id.rowSavedPlaces).setOnClickListener {
+            popup.dismiss(); showSavedPlacesMenu()
+        }
+        view.findViewById<View>(R.id.rowLogout).setOnClickListener {
+            popup.dismiss(); confirmLogout()
+        }
+
+        val offset = (resources.displayMetrics.density * 8).toInt()
+        popup.showAsDropDown(anchor, 0, offset)
     }
 
     /* -----------------------------
@@ -1620,53 +1621,64 @@ class MainActivity : AppCompatActivity() {
         ThemePrefs.toggle(this)
     }
 
-    private fun toggleBatterySaver() {
-        // Aquí puedes reducir frecuencia de GPS, desactivar animaciones, etc.
-        Toast.makeText(this, "Modo ahorro de batería activado/desactivado", Toast.LENGTH_SHORT).show()
-    }
-
-
+    /** Selector de tipo de mapa: 4 tarjetas con icono, la elegida en naranja. */
     private fun showMapTypeDialog() {
-        val opciones = arrayOf("Normal", "Terreno", "Híbrido")
+        val current = MapStyles.saved(this)
+        val view = layoutInflater.inflate(R.layout.dialog_map_type, null)
+        val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setView(view)
+            .create()
 
-        AlertDialog.Builder(this)
-            .setTitle("Tipo de mapa")
-            .setItems(opciones) { _, which ->
-                when (which) {
-                    0 -> setMapType("normal")
-                    1 -> setMapType("terrain")
-                    2 -> setMapType("hybrid")
-                }
+        val tiles = mapOf(
+            MapType.STANDARD to R.id.tileStandard,
+            MapType.HYBRID to R.id.tileHybrid,
+            MapType.TERRAIN to R.id.tileTerrain
+        )
+        tiles.forEach { (type, id) ->
+            val tile = view.findViewById<View>(id)
+            tile.isSelected = type == current
+            tile.setOnClickListener {
+                dialog.dismiss()
+                if (type != current) setMapType(type)
             }
-            .show()
+        }
+        dialog.show()
     }
 
+    private fun setMapType(type: MapType) {
+        if (!mapReady) return
+        MapStyles.save(this, type)
 
-    private fun setMapType(type: String) {
-        val apiKey = "bfde33420b5842fea5085295622148e9"
-
-        val styleUrl = when (type) {
-            "normal" ->
-                "https://maps.geoapify.com/v1/styles/osm-bright/style.json?apiKey=$apiKey"
-
-            "satellite" ->
-                "https://maps.geoapify.com/v1/styles/satellite/style.json?apiKey=$apiKey"
-
-            "terrain" ->
-                "https://maps.geoapify.com/v1/styles/terrain/style.json?apiKey=$apiKey"
-
-            "hybrid" ->
-                "https://maps.geoapify.com/v1/styles/satellite-hybrid/style.json?apiKey=$apiKey"
-
-            else ->
-                "https://maps.geoapify.com/v1/styles/osm-bright/style.json?apiKey=$apiKey"
+        map.setStyle(MapStyles.builder(this, type)) { style ->
+            // Al cambiar de estilo se borran las capas: volver a poner ubicación y ruta
+            activateLocationPuck(style)
+            redrawRouteAfterStyleChange(style)
         }
+        toast("Mapa: ${type.label}")
+    }
 
-        mapView.getMapAsync { map ->
-            map.setStyle(styleUrl)
+    /** Vuelve a dibujar la ruta actual (navegación o vista previa) en el estilo nuevo. */
+    private fun redrawRouteAfterStyleChange(style: Style) {
+        if (routePoints.isEmpty() || (!navigating && !previewing)) return
+        val line = LineString.fromLngLats(routePoints.map { Point.fromLngLat(it.longitude, it.latitude) })
+        style.addSource(GeoJsonSource("route", line))
+        if (previewing) {
+            style.addLayer(
+                LineLayer(LAYER_CASING, "route").withProperties(
+                    lineColor("#B35600"), lineWidth(10f),
+                    lineCap(org.maplibre.android.style.layers.Property.LINE_CAP_ROUND),
+                    lineJoin(org.maplibre.android.style.layers.Property.LINE_JOIN_ROUND)
+                )
+            )
         }
-
-        Toast.makeText(this, "Mapa cambiado a: $type", Toast.LENGTH_SHORT).show()
+        style.addLayer(
+            LineLayer("route-layer", "route").withProperties(
+                lineColor(if (previewing) "#FF8A00" else "#2196F3"),
+                lineWidth(if (previewing) 6.5f else 6f),
+                lineCap(org.maplibre.android.style.layers.Property.LINE_CAP_ROUND),
+                lineJoin(org.maplibre.android.style.layers.Property.LINE_JOIN_ROUND)
+            )
+        )
     }
 
     private fun updateMuteIcon() {

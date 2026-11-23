@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Menú de ajustes (botón ☰): tarjeta con iconos, interruptores y cerrar sesión -->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="280dp"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_popup"
+    android:elevation="12dp"
+    android:orientation="vertical"
+    android:paddingVertical="8dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="6dp"
+        android:text="Ajustes"
+        android:textColor="@color/du_on_surface"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <!-- Tipo de mapa -->
+    <LinearLayout android:id="@+id/rowMapType" style="@style/DriveUp.MenuRow">
+        <ImageView style="@style/DriveUp.MenuRow.Icon" android:src="@drawable/ic_map_hybrid" android:contentDescription="@null" />
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+            <TextView style="@style/DriveUp.MenuRow.Title" android:text="Tipo de mapa" />
+            <TextView
+                android:id="@+id/tvMapTypeValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Estándar"
+                android:textColor="@color/driveup_orange"
+                android:textSize="13sp" />
+        </LinearLayout>
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_chevron_right"
+            app:tint="@color/du_on_surface_variant" />
+    </LinearLayout>
+
+    <!-- Tema oscuro -->
+    <LinearLayout android:id="@+id/rowDarkMode" style="@style/DriveUp.MenuRow">
+        <ImageView style="@style/DriveUp.MenuRow.Icon" android:src="@drawable/ic_dark_mode" android:contentDescription="@null" />
+        <TextView style="@style/DriveUp.MenuRow.Title" android:layout_width="0dp" android:layout_weight="1" android:text="Tema oscuro" />
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchDarkMode"
+            style="@style/DriveUp.MenuSwitch" />
+    </LinearLayout>
+
+    <!-- Silenciar voz -->
+    <LinearLayout android:id="@+id/rowMute" style="@style/DriveUp.MenuRow">
+        <ImageView style="@style/DriveUp.MenuRow.Icon" android:src="@drawable/ic_volume_off" android:contentDescription="@null" />
+        <TextView style="@style/DriveUp.MenuRow.Title" android:layout_width="0dp" android:layout_weight="1" android:text="Silenciar voz" />
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchMute"
+            style="@style/DriveUp.MenuSwitch" />
+    </LinearLayout>
+
+    <!-- Casa y trabajo -->
+    <LinearLayout android:id="@+id/rowSavedPlaces" style="@style/DriveUp.MenuRow">
+        <ImageView style="@style/DriveUp.MenuRow.Icon" android:src="@drawable/ic_home" android:contentDescription="@null" />
+        <TextView style="@style/DriveUp.MenuRow.Title" android:layout_width="0dp" android:layout_weight="1" android:text="Casa y trabajo" />
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_chevron_right"
+            app:tint="@color/du_on_surface_variant" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginVertical="6dp"
+        android:background="@color/du_outline" />
+
+    <!-- Cerrar sesión -->
+    <LinearLayout android:id="@+id/rowLogout" style="@style/DriveUp.MenuRow">
+        <ImageView
+            style="@style/DriveUp.MenuRow.Icon"
+            android:src="@drawable/ic_logout"
+            android:contentDescription="@null"
+            app:tint="@color/du_danger" />
+        <TextView
+            style="@style/DriveUp.MenuRow.Title"
+            android:text="Cerrar sesión"
+            android:textColor="@color/du_danger" />
+    </LinearLayout>
+</LinearLayout>

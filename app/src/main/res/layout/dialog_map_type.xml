@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Selector de tipo de mapa: tres tarjetas en fila -->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:text="Tipo de mapa"
+        android:textColor="@color/du_on_surface"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="16dp"
+        android:text="Elige cómo quieres ver el mapa"
+        android:textColor="@color/du_on_surface_variant"
+        android:textSize="14sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:id="@+id/tileStandard"
+            style="@style/DriveUp.MapTile">
+            <ImageView style="@style/DriveUp.MapTile.Icon" android:src="@drawable/ic_map_standard" android:contentDescription="@null" />
+            <TextView style="@style/DriveUp.MapTile.Label" android:text="Estándar" />
+        </LinearLayout>
+
+        <Space android:layout_width="10dp" android:layout_height="0dp" />
+
+        <LinearLayout
+            android:id="@+id/tileHybrid"
+            style="@style/DriveUp.MapTile">
+            <ImageView style="@style/DriveUp.MapTile.Icon" android:src="@drawable/ic_map_hybrid" android:contentDescription="@null" />
+            <TextView style="@style/DriveUp.MapTile.Label" android:text="Híbrido" />
+        </LinearLayout>
+
+        <Space android:layout_width="10dp" android:layout_height="0dp" />
+
+        <LinearLayout
+            android:id="@+id/tileTerrain"
+            style="@style/DriveUp.MapTile">
+            <ImageView style="@style/DriveUp.MapTile.Icon" android:src="@drawable/ic_map_terrain" android:contentDescription="@null" />
+            <TextView style="@style/DriveUp.MapTile.Label" android:text="Relieve" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

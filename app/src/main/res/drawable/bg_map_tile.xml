@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tarjeta del selector de mapa: naranja suave con borde si está elegida -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#1FFF8A00" />
+            <stroke android:width="2dp" android:color="@color/driveup_orange" />
+            <corners android:radius="18dp" />
+        </shape>
+    </item>
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/du_outline" />
+            <corners android:radius="18dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/du_surface_variant" />
+            <stroke android:width="2dp" android:color="@android:color/transparent" />
+            <corners android:radius="18dp" />
+        </shape>
+    </item>
+</selector>

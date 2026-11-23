@@ -66,6 +66,70 @@
         <item name="cornerSize">14dp</item>
     </style>
 
+    <!-- Filas del menú de ajustes -->
+    <style name="DriveUp.MenuRow" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">56dp</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingStart">20dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+    <style name="DriveUp.MenuRow.Icon" parent="">
+        <item name="android:layout_width">36dp</item>
+        <item name="android:layout_height">36dp</item>
+        <item name="android:layout_marginEnd">14dp</item>
+        <item name="android:padding">8dp</item>
+        <item name="android:background">@drawable/bg_icon_soft_orange</item>
+        <item name="tint">@color/driveup_orange</item>
+    </style>
+    <style name="DriveUp.MenuRow.Title" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/du_on_surface</item>
+        <item name="android:textSize">15sp</item>
+    </style>
+    <style name="DriveUp.MenuSwitch" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:clickable">false</item>
+        <item name="android:focusable">false</item>
+        <item name="thumbTint">@color/switch_thumb</item>
+        <item name="trackTint">@color/switch_track</item>
+    </style>
+
+    <!-- Selector de tipo de mapa -->
+    <style name="DriveUp.MapTile" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">104dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:gravity">center</item>
+        <item name="android:background">@drawable/bg_map_tile</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:duplicateParentState">false</item>
+    </style>
+    <style name="DriveUp.MapTile.Icon" parent="">
+        <item name="android:layout_width">32dp</item>
+        <item name="android:layout_height">32dp</item>
+        <item name="android:duplicateParentState">true</item>
+        <item name="tint">@color/map_tile_content</item>
+    </style>
+    <style name="DriveUp.MapTile.Label" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">8dp</item>
+        <item name="android:duplicateParentState">true</item>
+        <item name="android:textColor">@color/map_tile_content</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
     <!-- Chips de categoría de la tienda -->
     <style name="Widget.DriveUp.Chip" parent="Widget.MaterialComponents.Chip.Choice">
         <item name="chipBackgroundColor">@color/chip_bg</item>
