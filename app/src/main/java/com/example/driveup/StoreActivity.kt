@@ -35,13 +35,13 @@ class StoreActivity : AppCompatActivity() {
     private var selectedCategory = "Todas"
 
     // ===== CATEGORÍAS FILTRO =====
+    // Solo las categorías generales. Los nombres deben coincidir con el campo
+    // "category" de store_items en Firestore. Los productos de otras categorías
+    // siguen saliendo en "Todas".
     private val filterCategories = listOf(
         "Todas",
-        "Ropa", "Supermercados", "Gasolina", "Viajes", "Tecnología",
-        "Maquillaje y cosmeticos", "Ocio", "Coches", "Gimnasio",
-        "Ornamento", "Restaurante", "Libros", "Amazón", "Farmacia",
-        "Talleres", "Cerveza", "Higiene Personal",
-        "Compañia de telefono", "Vinilos", "Transporte"
+        "Gasolina", "Coches", "Supermercados", "Restaurante",
+        "Ropa", "Tecnología", "Ocio", "Viajes"
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
