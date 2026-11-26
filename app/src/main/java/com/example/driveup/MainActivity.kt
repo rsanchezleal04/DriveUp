@@ -130,10 +130,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cancelButtonContainer: LinearLayout
     private lateinit var tvPreviewRoute: TextView
     private lateinit var tvPreviewAlt: TextView
+    private lateinit var tvNextTime: TextView
     private lateinit var btnGoHome: Button
     private lateinit var btnGoWork: Button
 
+    private var offRouteCount = 0
+    private var lastUserGestureTime = 0L
+
     private companion object {
+        const val OFF_ROUTE_METERS = 50f
+        const val AUTO_RECENTER_MS = 8000L
         const val SRC_ALT = "route-alt"
         const val LAYER_ALT = "route-alt-layer"
         const val LAYER_CASING = "route-casing-layer"
@@ -188,6 +194,7 @@ class MainActivity : AppCompatActivity() {
         cancelButtonContainer = findViewById(R.id.cancelButtonContainer)
         tvPreviewRoute = findViewById(R.id.tvPreviewRoute)
         tvPreviewAlt = findViewById(R.id.tvPreviewAlt)
+        tvNextTime = findViewById(R.id.tvNextTime)
 
         fusedLocation = LocationServices.getFusedLocationProviderClient(this)
 
@@ -202,6 +209,7 @@ class MainActivity : AppCompatActivity() {
                 map.addOnCameraMoveStartedListener { reason ->
                     if (reason == 1) { // gesto del usuario
                         followUser = false
+                        lastUserGestureTime = System.currentTimeMillis()
                         map.locationComponent.cameraMode = CameraMode.NONE
                     }
                 }
@@ -406,11 +414,8 @@ class MainActivity : AppCompatActivity() {
 
                 // ================= VELOCIDAD =================
 
-                val speed = if (loc.hasSpeed()) {
-                    speedManager.update(loc)
-                } else {
-                    speedManager.getCurrentSpeed()
-                }
+                // SpeedManager ya filtra el ruido del GPS (parado = 0) y los datos imprecisos
+                val speed = speedManager.update(loc)
 
                 tvSpeed.text = speed.toString()
 
@@ -468,15 +473,8 @@ class MainActivity : AppCompatActivity() {
 
         map.locationComponent.cameraMode = CameraMode.NONE
 
-        val position = CameraPosition.Builder()
-            .target(getOffsetLatLng(location, 40.0))
-            .zoom(17.0)
-            .tilt(45.0)
-            .bearing(location.bearing.toDouble())
-            .build()
-
         map.animateCamera(
-            CameraUpdateFactory.newCameraPosition(position),
+            CameraUpdateFactory.newCameraPosition(cameraPositionFor(location, map.cameraPosition.bearing)),
             1200
         )
     }
@@ -488,42 +486,68 @@ class MainActivity : AppCompatActivity() {
 
         followUser = true
 
-        val position = CameraPosition.Builder()
-            .target(getOffsetLatLng(loc, 40.0))
-            .zoom(17.0)
-            .tilt(45.0)
-            .bearing(loc.bearing.toDouble())
-            .build()
-
         map.animateCamera(
-            CameraUpdateFactory.newCameraPosition(position),
+            CameraUpdateFactory.newCameraPosition(cameraPositionFor(loc, map.cameraPosition.bearing)),
             1000
         )
     }
 
+    /**
+     * Cámara centrada en el coche DENTRO de la zona visible del mapa (entre la barra de
+     * arriba y los paneles de abajo), para que el punto no quede tapado.
+     * Navegando y en marcha, el coche se coloca más abajo para ver más carretera por delante.
+     */
+    private fun cameraPositionFor(loc: Location, bearing: Double): CameraPosition {
+        val density = resources.displayMetrics.density
+        val mapH = mapView.height.toDouble()
+
+        // Borde inferior: el panel visible más alto de los de abajo
+        val bottomPanels = listOf(routeInputContainer, previewPanel, cancelButtonContainer, navigationBar)
+        val panelTop = bottomPanels.filter { it.visibility == View.VISIBLE && it.height > 0 }
+            .minOfOrNull { it.top }?.toDouble() ?: mapH
+        val bottom = (mapH - panelTop + 16 * density).coerceAtLeast(0.0)
+
+        // Borde superior: la barra naranja de navegación o los botones de arriba
+        val topBar = if (tripTopBarOrange.visibility == View.VISIBLE && tripTopBarOrange.height > 0)
+            tripTopBarOrange.bottom.toDouble() else (16 + 52) * density.toDouble()
+        var top = topBar + 16 * density
+
+        // En marcha durante la navegación: coche en el tercio inferior de la zona visible
+        val moving = speedManager.getCurrentSpeed() >= 7
+        if (navigating && moving) {
+            top += (mapH - top - bottom) * 0.35
+        }
+
+        return CameraPosition.Builder()
+            .target(LatLng(loc.latitude, loc.longitude))
+            .zoom(17.0)
+            .tilt(45.0)
+            .bearing(bearing)
+            .padding(0.0, top, 0.0, bottom)
+            .build()
+    }
+
     //====================== TRACKING=============================
     private fun updateCameraFollowingCar(loc: Location) {
-        if (!followUser || previewing) return
-        if (!mapReady) return
+        if (previewing || !mapReady) return
 
-        // Bearing solo si velocidad ≥ 2 km/h (≈ 0.55 m/s)
-        val bearing = if (loc.hasSpeed() && loc.speed >= 0.55f) {
+        // Navegando: si el usuario movió el mapa, volver a centrar tras unos segundos
+        if (!followUser && navigating &&
+            System.currentTimeMillis() - lastUserGestureTime > AUTO_RECENTER_MS
+        ) {
+            followUser = true
+        }
+        if (!followUser) return
+
+        // Girar el mapa solo cuando de verdad te mueves (si no, el rumbo del GPS es ruido)
+        val bearing = if (loc.hasBearing() && speedManager.getCurrentSpeed() >= 7) {
             loc.bearing.toDouble()
         } else {
             map.cameraPosition.bearing
         }
 
-        val target = getOffsetLatLng(loc, 40.0)
-
-        val position = CameraPosition.Builder()
-            .target(target)
-            .zoom(17.0)
-            .tilt(45.0)
-            .bearing(bearing)
-            .build()
-
         map.animateCamera(
-            CameraUpdateFactory.newCameraPosition(position),
+            CameraUpdateFactory.newCameraPosition(cameraPositionFor(loc, bearing)),
             600
         )
     }
@@ -576,7 +600,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         runOnUiThread {
-            if (previewing) drawPreview(res, o, d) else drawRoute(res)
+            try {
+                if (previewing) drawPreview(res, o, d) else drawRoute(res)
+            } catch (e: org.json.JSONException) {
+                // OSRM devolvió un error (p. ej. "NoRoute"): no cerrar la app
+                isRecalculating = false
+                toast("No se pudo calcular la ruta")
+            }
         }
     }
 
@@ -718,6 +748,8 @@ class MainActivity : AppCompatActivity() {
     private fun onNavigationStarted() {
         navigating = true
         previewing = false
+        followUser = true          // al empezar a navegar, la cámara sigue al coche
+        offRouteCount = 0
         updateStoreVisibility()
 
         runOnUiThread {
@@ -1000,6 +1032,7 @@ class MainActivity : AppCompatActivity() {
                 // Actualizar barra superior
                 tvInstructionTop.text = first.instruction
                 tvNextDistance.text = "${first.distance.toInt()} m"
+                tvNextTime.visibility = View.GONE
                 updateTurnIconSmall(first.instruction)
             }
 
@@ -1030,36 +1063,25 @@ class MainActivity : AppCompatActivity() {
         if (destinationLatLng == null) return
 
 
-        var minDistance = Float.MAX_VALUE
-
-
-        for (p in routePoints) {
-
-            val tmp = Location("").apply {
-                latitude = p.latitude
-                longitude = p.longitude
-            }
-
-            val d = loc.distanceTo(tmp)
-
-            if (d < minDistance) {
-                minDistance = d
-            }
-        }
-
+        // Distancia a los TRAMOS de la ruta (no solo a sus vértices: en rectas largas
+        // los vértices pueden estar a cientos de metros y daba falsos desvíos)
+        val minDistance = distanceToRouteMeters(loc, routePoints)
 
         // ================= DESVÍO =================
+
+        // Exigir 2 lecturas seguidas fuera de ruta para ignorar saltos sueltos del GPS
+        offRouteCount = if (minDistance > OFF_ROUTE_METERS) offRouteCount + 1 else 0
 
         val now = System.currentTimeMillis()
 
         if (
-            minDistance > 50 &&
+            offRouteCount >= 2 &&
             now - lastRecalcTime > 8000
         ) {
 
             lastRecalcTime = now
             isRecalculating = true
-
+            offRouteCount = 0
 
             val current = LatLng(
                 loc.latitude,
@@ -1068,25 +1090,44 @@ class MainActivity : AppCompatActivity() {
 
             val dest = destinationLatLng ?: return
 
+            tvInstruction.text = "Recalculando ruta…"
+            tvInstructionTop.text = "Recalculando ruta…"
+            tvStepDistance.text = ""
 
+            // La ruta vieja se mantiene hasta que llegue la nueva: si falla la red,
+            // se vuelve a intentar en el siguiente desvío en vez de quedarse sin ruta.
             lifecycleScope.launch(Dispatchers.IO) {
-
-                runOnUiThread {
-
-                    clearRoute()
-
-                    navigationSteps = emptyList()
-                    currentStepIndex = 0
-                    arrived = false
-
-                    tvInstruction.text = "Recalculando ruta…"
-                    tvStepDistance.text = ""
-                }
-
-
                 fetchRoute(current, dest)
             }
         }
+    }
+
+    /** Distancia mínima (m) del punto a la polilínea, usando una proyección local plana. */
+    private fun distanceToRouteMeters(loc: Location, points: List<LatLng>): Float {
+        if (points.size == 1) {
+            val r = FloatArray(1)
+            Location.distanceBetween(loc.latitude, loc.longitude, points[0].latitude, points[0].longitude, r)
+            return r[0]
+        }
+        val mPerDegLat = 111_320.0
+        val mPerDegLon = 111_320.0 * cos(Math.toRadians(loc.latitude))
+        fun x(p: LatLng) = (p.longitude - loc.longitude) * mPerDegLon
+        fun y(p: LatLng) = (p.latitude - loc.latitude) * mPerDegLat
+
+        var best = Double.MAX_VALUE
+        for (i in 0 until points.size - 1) {
+            val ax = x(points[i]); val ay = y(points[i])
+            val bx = x(points[i + 1]); val by = y(points[i + 1])
+            val dx = bx - ax; val dy = by - ay
+            val len2 = dx * dx + dy * dy
+            // El punto actual es el origen (0,0): proyectarlo sobre el tramo AB
+            val t = if (len2 == 0.0) 0.0 else ((-ax) * dx + (-ay) * dy) / len2
+            val tc = t.coerceIn(0.0, 1.0)
+            val px = ax + tc * dx; val py = ay + tc * dy
+            val d = sqrt(px * px + py * py)
+            if (d < best) best = d
+        }
+        return best.toFloat()
     }
 
 
@@ -1238,12 +1279,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun editSavedPlace(place: SavedPlaces.Place, openRouteAfterSave: Boolean = false) {
         val density = resources.displayMetrics.density
-        val input = EditText(this).apply {
+        // Campo con autocompletado, igual que origen y destino
+        val input = AutoCompleteTextView(this).apply {
             hint = "Calle, número y ciudad"
             setText(SavedPlaces.get(this@MainActivity, place) ?: "")
             setSelection(text.length)
             setSingleLine()
         }
+        setupAutocomplete(input)
         val container = FrameLayout(this).apply {
             setPadding((20 * density).toInt(), (8 * density).toInt(), (20 * density).toInt(), 0)
             addView(input)
@@ -1304,10 +1347,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateSavedPlaceButtons() {
-        fun label(place: SavedPlaces.Place) =
-            if (SavedPlaces.get(this, place) == null) "Añadir ${place.label.lowercase()}" else place.label
-        btnGoHome.text = label(SavedPlaces.Place.HOME)
-        btnGoWork.text = label(SavedPlaces.Place.WORK)
+        // Siempre "Casa" / "Trabajo" (con "Añadir …" se cortaba en móviles estrechos).
+        // Si no está guardada, al pulsar se pide la dirección.
+        btnGoHome.text = SavedPlaces.Place.HOME.label
+        btnGoWork.text = SavedPlaces.Place.WORK.label
+        btnGoHome.alpha = if (SavedPlaces.get(this, SavedPlaces.Place.HOME) == null) 0.7f else 1f
+        btnGoWork.alpha = if (SavedPlaces.get(this, SavedPlaces.Place.WORK) == null) 0.7f else 1f
     }
 
     private fun hideKeyboard() {
@@ -1332,10 +1377,10 @@ class MainActivity : AppCompatActivity() {
     // ================= CAMERA =================
     private fun getOffsetLatLng(
         location: Location,
-        offsetMeters: Double
+        offsetMeters: Double,
+        bearing: Double = location.bearing.toDouble()
     ): LatLng {
 
-        val bearing = location.bearing.toDouble()
 
         val earthRadius = 6378137.0 // metros
         val distance = offsetMeters / earthRadius
@@ -1449,9 +1494,15 @@ class MainActivity : AppCompatActivity() {
 
         // Actualizar barra superior
         tvInstructionTop.text = step.instruction
-        tvNextDistance.text = "$distance m"
+        tvNextDistance.text = if (distance >= 1000) "%.1f km".format(distance / 1000f) else "$distance m"
 
-        // Calcular tiempo aproximado basado en velocidad actual
+        // Tiempo hasta la próxima maniobra según la velocidad actual (antes ponía "45 min" fijo)
+        val kmh = speedManager.getCurrentSpeed()
+        tvNextTime.text = if (kmh >= 7) {
+            val secs = (distance / (kmh / 3.6)).toInt()
+            if (secs < 60) "$secs s" else "${secs / 60} min"
+        } else ""
+        tvNextTime.visibility = if (tvNextTime.text.isEmpty()) View.GONE else View.VISIBLE
 
         // Actualizar icono pequeño
         updateTurnIconSmall(step.instruction)
@@ -1906,6 +1957,62 @@ private fun saveTripResult(tripResult: TripResult) {
 
 
     //======================= AUTOCOMPLETADO ===============================
+
+    /**
+     * Sugerencias ordenadas por cercanía a tu ubicación:
+     *  1) busca primero en un radio de 50 km y ordena de más cerca a más lejos;
+     *  2) si salen pocas, completa con resultados de toda España.
+     * Sin ubicación todavía, busca solo en España.
+     * (Se llama desde un hilo de fondo: hace peticiones de red.)
+     */
+    private fun fetchNearbySuggestions(query: String): List<PlaceSuggestion> {
+        val loc = currentLocation
+        val q = URLEncoder.encode(query, "UTF-8")
+        val base = "https://api.geoapify.com/v1/geocode/autocomplete?text=$q&lang=es" +
+                "&apiKey=bfde33420b5842fea5085295622148e9"
+
+        data class Found(val s: PlaceSuggestion, val meters: Float)
+
+        fun request(extra: String, limit: Int): List<Found> {
+            val body = client.newCall(Request.Builder().url("$base&limit=$limit$extra").build())
+                .execute().use { it.body?.string() } ?: return emptyList()
+            val features = JSONObject(body).optJSONArray("features") ?: return emptyList()
+            return (0 until features.length()).mapNotNull { i ->
+                val props = features.getJSONObject(i).getJSONObject("properties")
+                val formatted = props.optString("formatted")
+                if (formatted.isBlank()) return@mapNotNull null
+                val meters = if (loc != null) {
+                    val r = FloatArray(1)
+                    Location.distanceBetween(loc.latitude, loc.longitude, props.optDouble("lat"), props.optDouble("lon"), r)
+                    r[0]
+                } else 0f
+                Found(
+                    PlaceSuggestion(
+                        title = props.optString("address_line1").ifBlank { formatted.substringBefore(",") },
+                        subtitle = props.optString("address_line2"),
+                        formatted = formatted
+                    ),
+                    meters
+                )
+            }
+        }
+
+        if (loc == null) return request("&filter=countrycode:es", 5).map { it.s }
+
+        val p = "%.5f,%.5f".format(java.util.Locale.US, loc.longitude, loc.latitude)
+        val nearby = request("&filter=circle:$p,50000&bias=proximity:$p", 10).sortedBy { it.meters }
+
+        val result = nearby.take(5).toMutableList()
+        if (result.size < 3) {
+            // Pocos resultados cerca (p. ej. buscas otra ciudad): completar con toda España
+            request("&filter=countrycode:es&bias=proximity:$p", 5)
+                .sortedBy { it.meters }
+                .filter { f -> result.none { it.s.formatted == f.s.formatted } }
+                .forEach { if (result.size < 5) result.add(it) }
+        }
+        return result.map { it.s }
+    }
+
     private fun setupAutocomplete(editText: AutoCompleteTextView) {
         var searchJob: Job? = null
         var autocompleteLocked = false
@@ -1916,10 +2023,12 @@ private fun saveTripResult(tripResult: TripResult) {
         editText.dropDownVerticalOffset = 0
         editText.dropDownHorizontalOffset = 0
 
-        // Estilo para el dropdown (opcional, ayuda con el rendimiento)
+        // Lista de sugerencias redondeada y del color del tema
         editText.setDropDownBackgroundDrawable(
-            ContextCompat.getDrawable(this, android.R.drawable.dialog_holo_light_frame)
+            ContextCompat.getDrawable(this, R.drawable.bg_popup)
         )
+        editText.dropDownVerticalOffset = (6 * resources.displayMetrics.density).toInt()
+        editText.threshold = 1
 
         // ================= CAMBIO 2: TextWatcher optimizado =================
         editText.addTextChangedListener(object : TextWatcher {
@@ -1944,52 +2053,13 @@ private fun saveTripResult(tripResult: TripResult) {
                     delay(400) // Aumentar debounce a 400ms
 
                     try {
-                        val url =
-                            "https://api.geoapify.com/v1/geocode/autocomplete" +
-                                    "?text=${URLEncoder.encode(query, "UTF-8")}" +
-                                    "&lang=es&limit=5&apiKey=bfde33420b5842fea5085295622148e9"
-
-                        val request = Request.Builder().url(url).build()
-                        val response = client.newCall(request).execute()
-                        val body = response.body?.string() ?: return@launch
-
-                        val suggestions = mutableListOf<String>()
-                        val features = JSONObject(body).optJSONArray("features") ?: JSONArray()
-
-                        for (i in 0 until features.length()) {
-                            val props = features.getJSONObject(i).getJSONObject("properties")
-                            suggestions.add(props.getString("formatted"))
-                        }
+                        val suggestions = fetchNearbySuggestions(query)
 
                         withContext(Dispatchers.Main) {
                             // CAMBIO 3: Verificar que el editText aún esté enfocado
                             if (!editText.isFocused || autocompleteLocked) return@withContext
 
-                            // ADAPTADOR CON COLORES PERSONALIZADOS (SOLO CAMBIO)
-                            val adapter = object : ArrayAdapter<String>(
-                                this@MainActivity,
-                                android.R.layout.simple_dropdown_item_1line,
-                                android.R.id.text1,
-                                suggestions
-                            ) {
-                                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                                    val view = super.getView(position, convertView, parent)
-                                    val textView = view.findViewById<TextView>(android.R.id.text1)
-                                    textView.setTextColor(ContextCompat.getColor(context, R.color.du_on_surface))
-                                    textView.setBackgroundColor(Color.TRANSPARENT)
-                                    return view
-                                }
-
-                                override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
-                                    val view = super.getDropDownView(position, convertView, parent)
-                                    val textView = view.findViewById<TextView>(android.R.id.text1)
-                                    textView.setTextColor(ContextCompat.getColor(context, R.color.du_on_surface))
-                                    textView.setBackgroundColor(Color.TRANSPARENT)
-                                    return view
-                                }
-                            }
-
-                            editText.setAdapter(adapter)
+                            editText.setAdapter(PlaceSuggestionAdapter(this@MainActivity, suggestions))
 
                             // Mostrar dropdown solo si hay sugerencias
                             if (suggestions.isNotEmpty() && !autocompleteLocked && editText.isFocused) {
@@ -2004,7 +2074,7 @@ private fun saveTripResult(tripResult: TripResult) {
 
         // ================= CAMBIO 4: Manejo de selección mejorado =================
         editText.setOnItemClickListener { parent, _, position, _ ->
-            val selected = parent.getItemAtPosition(position) as String
+            val selected = parent.getItemAtPosition(position).toString()
 
             autocompleteLocked = true
             editText.setText(selected)

@@ -69,6 +69,10 @@ class LoginActivity : AppCompatActivity() {
         btnRegister.setOnClickListener {
             startActivity(Intent(this, RegisterActivity::class.java))
         }
+
+        findViewById<TextView>(R.id.tvForgotPassword).setOnClickListener {
+            showResetPassword()
+        }
     }
 
     // ===== LÓGICA DE LOGIN =====
@@ -89,7 +93,7 @@ class LoginActivity : AppCompatActivity() {
         if (input.contains("@")) {
             auth.signInWithEmailAndPassword(input, pass)
                 .addOnSuccessListener { handlePostLogin() }
-                .addOnFailureListener { toast("Credenciales incorrectas") }
+                .addOnFailureListener { e -> toast(loginErrorMessage(e)) }
             return
         }
 
@@ -107,11 +111,54 @@ class LoginActivity : AppCompatActivity() {
 
                 auth.signInWithEmailAndPassword(email, pass)
                     .addOnSuccessListener { handlePostLogin() }
-                    .addOnFailureListener { toast("Credenciales incorrectas") }
+                    .addOnFailureListener { e -> toast(loginErrorMessage(e)) }
             }
             .addOnFailureListener {
                 toast("Error al iniciar sesión")
             }
+    }
+
+    /** Traduce el error de Firebase a un mensaje claro en vez de "Credenciales incorrectas" para todo. */
+    private fun loginErrorMessage(e: Exception): String = when (e) {
+        is com.google.firebase.auth.FirebaseAuthInvalidUserException ->
+            if (e.errorCode == "ERROR_USER_DISABLED") "Esta cuenta está desactivada"
+            else "No existe ninguna cuenta con ese correo"
+        is com.google.firebase.auth.FirebaseAuthInvalidCredentialsException ->
+            "Correo o contraseña incorrectos"
+        is com.google.firebase.FirebaseTooManyRequestsException ->
+            "Demasiados intentos. Espera unos minutos o restablece la contraseña"
+        is com.google.firebase.FirebaseNetworkException ->
+            "Sin conexión a internet"
+        else -> "No se pudo iniciar sesión: ${e.localizedMessage ?: "error desconocido"}"
+    }
+
+    /** Envía un correo para restablecer la contraseña. */
+    private fun showResetPassword() {
+        val prefill = etUser.text.toString().trim().takeIf { it.contains("@") } ?: ""
+        val density = resources.displayMetrics.density
+        val input = EditText(this).apply {
+            hint = "Tu correo"
+            setText(prefill)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                    android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+        }
+        val box = FrameLayout(this).apply {
+            setPadding((20 * density).toInt(), (8 * density).toInt(), (20 * density).toInt(), 0)
+            addView(input)
+        }
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("Restablecer contraseña")
+            .setMessage("Te enviaremos un correo para crear una contraseña nueva.")
+            .setView(box)
+            .setPositiveButton("Enviar") { _, _ ->
+                val email = input.text.toString().trim()
+                if (!email.contains("@")) { toast("Escribe un correo válido"); return@setPositiveButton }
+                auth.sendPasswordResetEmail(email)
+                    .addOnSuccessListener { toast("Correo enviado. Revisa tu bandeja (y spam)") }
+                    .addOnFailureListener { e -> toast(loginErrorMessage(e)) }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     private fun handlePostLogin() {

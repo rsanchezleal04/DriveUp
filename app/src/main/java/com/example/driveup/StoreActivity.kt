@@ -100,13 +100,21 @@ class StoreActivity : AppCompatActivity() {
             val userCategories = user?.categories ?: emptyMap()
 
             listenStoreItems(userCategories)
+        }.addOnFailureListener {
+            // Aunque falle el usuario (p. ej. sin conexión), intentar cargar la tienda igualmente
+            listenStoreItems(emptyMap())
         }
     }
 
     private fun listenStoreItems(userCategories: Map<String, Long>) {
         db.collection("store_items")
             .addSnapshotListener { snapshots, e ->
-                if (e != null || snapshots == null) return@addSnapshotListener
+                if (e != null || snapshots == null) {
+                    showEmpty("No se pudieron cargar las recompensas.\nComprueba tu conexión a internet.")
+                    return@addSnapshotListener
+                }
+                // Sin conexión y sin nada guardado en el móvil: decirlo claramente
+                offline = snapshots.metadata.isFromCache && snapshots.isEmpty
 
                 allItems.clear()
 
@@ -129,10 +137,25 @@ class StoreActivity : AppCompatActivity() {
             }
     }
 
+    private var offline = false
+
     private fun applyFilter() {
         val items = if (selectedCategory == "Todas") sortedItems
                     else sortedItems.filter { it.category == selectedCategory }
         adapter.updateItems(items)
-        tvEmpty.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
+        if (items.isEmpty()) {
+            showEmpty(
+                if (offline) "Sin conexión a internet.\nConéctate para ver las recompensas."
+                else "No hay recompensas en esta categoría"
+            )
+        } else {
+            tvEmpty.visibility = View.GONE
+        }
+    }
+
+    private fun showEmpty(msg: String) {
+        tvEmpty.text = msg
+        tvEmpty.gravity = android.view.Gravity.CENTER
+        tvEmpty.visibility = View.VISIBLE
     }
 }

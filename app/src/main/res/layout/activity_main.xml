@@ -422,6 +422,8 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="10dp"
             android:hint="Origen"
+            app:expandedHintEnabled="false"
+            app:placeholderText="Tu ubicación"
             app:startIconDrawable="@drawable/ic_origin">
 
             <AutoCompleteTextView
@@ -447,6 +449,8 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
             android:hint="Destino"
+            app:expandedHintEnabled="false"
+            app:placeholderText="¿A dónde vas?"
             app:startIconDrawable="@drawable/ic_place">
 
             <AutoCompleteTextView
